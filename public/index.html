@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0d0d0f">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="stylesheet" href="/xterm/css/xterm.css">
+  <title>claw</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d0d0f; --surface: #161618; --border: #2a2a2e;
+      --text: #d0d0d8; --muted: #555560; --green: #00e676;
+      --red: #ff5252; --blue: #448aff;
+      --sai-top: env(safe-area-inset-top, 0px);
+      --sai-bottom: env(safe-area-inset-bottom, 0px);
+      --sai-left: env(safe-area-inset-left, 0px);
+      --sai-right: env(safe-area-inset-right, 0px);
+    }
+    html, body {
+      height: 100%; background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Mono', 'Fira Code', monospace;
+      overflow: hidden; overscroll-behavior: none;
+      -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+      touch-action: none;
+    }
+    #app { display: flex; flex-direction: column; height: 100dvh; height: -webkit-fill-available; padding-top: var(--sai-top); }
+
+    /* ── Tabs ── */
+    #tabs {
+      display: flex; background: var(--surface); border-bottom: 1px solid var(--border);
+      flex-shrink: 0; overflow-x: auto; scrollbar-width: none;
+      padding-left: var(--sai-left); padding-right: var(--sai-right);
+    }
+    #tabs::-webkit-scrollbar { display: none; }
+    .tab {
+      padding: 8px 16px; font-size: 13px; color: var(--muted); cursor: pointer;
+      border-bottom: 2px solid transparent; white-space: nowrap; flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent; transition: color .15s;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--green); border-bottom-color: var(--green); }
+
+    /* ── Panels ── */
+    .panel { flex: 1; display: none; overflow: hidden; position: relative; }
+    .panel.active { display: flex; flex-direction: column; }
+
+    /* VNC */
+    #vnc-wrap { flex: 1; background: #000; overflow: hidden; touch-action: none; position: relative; }
+    #vnc-wrap canvas { display: block; touch-action: none; }
+
+    /* Monitor selector */
+    .mon-sel { display: flex; gap: 2px; }
+    .mon-btn {
+      background: transparent; border: 1px solid var(--border); color: var(--muted);
+      padding: 4px 8px; font-size: 11px; cursor: pointer; font-family: inherit;
+      transition: all .15s; -webkit-tap-highlight-color: transparent;
+    }
+    .mon-btn:first-child { border-radius: 4px 0 0 4px; }
+    .mon-btn:last-child { border-radius: 0 4px 4px 0; }
+    .mon-btn.active { color: var(--green); border-color: var(--green); background: rgba(0,230,118,.08); }
+    .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: rgba(0,0,0,0.82); z-index: 50; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+    .overlay.hidden { display: none; }
+    .overlay-title { font-size: 15px; color: var(--muted); }
+    .spinner { width: 28px; height: 28px; border: 2px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Terminal */
+    #term-container { flex: 1; padding: 4px; background: #000; overflow: hidden; }
+    #term-container .xterm { height: 100%; }
+
+    /* Files */
+    #files-panel { padding: 10px; overflow-y: auto; -webkit-overflow-scrolling: touch; flex: 1; touch-action: pan-y; }
+    #files-path { display: flex; align-items: center; gap: 6px; padding: 6px 0; flex-wrap: wrap; }
+    #files-path-text { font-size: 12px; color: var(--blue); word-break: break-all; flex: 1; }
+    #files-list { list-style: none; }
+    #files-list li {
+      display: flex; align-items: center; gap: 8px; padding: 10px 8px;
+      border-bottom: 1px solid var(--border); cursor: pointer;
+      -webkit-tap-highlight-color: transparent; font-size: 14px;
+    }
+    #files-list li:active { background: rgba(255,255,255,0.04); }
+    .f-icon { font-size: 16px; flex-shrink: 0; width: 20px; text-align: center; }
+    .f-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .f-actions { display: flex; gap: 4px; }
+    .f-btn { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer; font-family: inherit; }
+    .f-btn:hover { color: var(--text); border-color: #555; }
+
+    /* Upload area */
+    #upload-area {
+      border: 2px dashed var(--border); border-radius: 8px; padding: 16px;
+      text-align: center; color: var(--muted); font-size: 12px; margin-top: 10px;
+      cursor: pointer; transition: border-color .2s;
+    }
+    #upload-area:hover, #upload-area.drag { border-color: var(--green); color: var(--text); }
+
+    /* ── Bottom bar ── */
+    #bar {
+      display: flex; align-items: center; gap: 4px; padding: 5px 8px;
+      padding-bottom: max(5px, var(--sai-bottom));
+      padding-left: max(8px, var(--sai-left)); padding-right: max(8px, var(--sai-right));
+      background: var(--surface); border-top: 1px solid var(--border);
+      flex-shrink: 0; overflow-x: auto; overflow-y: hidden;
+      -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    }
+    #bar::-webkit-scrollbar { display: none; }
+    .btn {
+      background: transparent; border: 1px solid var(--border); color: var(--muted);
+      padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px;
+      font-family: inherit; white-space: nowrap; flex-shrink: 0;
+      transition: color .12s, border-color .12s, background .12s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:hover { color: var(--text); border-color: #555; }
+    .btn.on { color: var(--green); border-color: var(--green); background: rgba(0,230,118,.08); }
+    #dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex-shrink: 0; transition: background .3s; }
+    #dot.ok { background: var(--green); }
+    #dot.err { background: var(--red); }
+    #status-text { font-size: 11px; color: var(--muted); white-space: nowrap; }
+    .sep { width: 1px; height: 22px; background: var(--border); margin: 0 2px; flex-shrink: 0; }
+    .spacer { flex: 1; min-width: 4px; }
+
+    /* ── D-pad ── */
+    #dpad-wrap { position: fixed; bottom: calc(54px + var(--sai-bottom)); right: calc(12px + var(--sai-right)); display: none; flex-direction: column; align-items: center; gap: 4px; z-index: 100; }
+    #dpad-wrap.show { display: flex; }
+    .drow { display: flex; gap: 4px; }
+    .dp { width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; background: rgba(18,18,22,0.88); border: 1px solid rgba(255,255,255,.14); border-radius: 10px; color: #bbb; font-size: 19px; cursor: pointer; touch-action: none; -webkit-tap-highlight-color: transparent; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+    .dp.ghost { visibility: hidden; }
+    .dp.mid { font-size: 10px; color: var(--muted); }
+    .dp:active, .dp.held { background: rgba(0,230,118,.18); color: var(--green); border-color: var(--green); }
+    #speed-row { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+    #speed-row label { font-size: 10px; color: var(--muted); }
+    #speed-slider { width: 80px; accent-color: var(--green); }
+
+    /* ── Keyboard panel ── */
+    #kbd-panel { position: fixed; bottom: calc(50px + var(--sai-bottom)); left: 50%; transform: translateX(-50%); background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; display: none; flex-direction: column; gap: 9px; width: min(96vw, 460px); z-index: 100; box-shadow: 0 6px 32px rgba(0,0,0,.7); }
+    #kbd-panel.show { display: flex; }
+    #kbd-input { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: 8px; font-size: 16px; font-family: inherit; width: 100%; outline: none; -webkit-user-select: text; user-select: text; touch-action: auto; }
+    #kbd-input:focus { border-color: var(--blue); }
+    .key-grid { display: flex; flex-wrap: wrap; gap: 5px; }
+    .k { background: var(--bg); border: 1px solid var(--border); color: #aaa; padding: 6px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; font-family: inherit; white-space: nowrap; -webkit-tap-highlight-color: transparent; }
+    .k:active { background: #222; color: var(--text); }
+
+    /* ── Clipboard modal ── */
+    #clip-modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.7); z-index: 200; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+    #clip-modal.show { display: flex; }
+    #clip-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; width: min(92vw, 440px); display: flex; flex-direction: column; gap: 10px; }
+    #clip-box h3 { font-size: 14px; color: var(--text); font-weight: 500; }
+    #clip-textarea { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 10px; border-radius: 8px; font-size: 14px; font-family: inherit; width: 100%; height: 120px; resize: vertical; outline: none; -webkit-user-select: text; user-select: text; touch-action: auto; }
+    #clip-textarea:focus { border-color: var(--blue); }
+    #clip-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+    /* ── Toast ── */
+    #toast { position: fixed; top: calc(16px + var(--sai-top)); left: 50%; transform: translateX(-50%) translateY(-120%); background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 8px 16px; border-radius: 8px; font-size: 12px; z-index: 300; transition: transform .3s ease; pointer-events: none; }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+<div id="app">
+  <!-- Tabs -->
+  <div id="tabs">
+    <div class="tab active" data-panel="panel-vnc">Desktop</div>
+    <div class="tab" data-panel="panel-term">Terminal</div>
+    <div class="tab" data-panel="panel-files">Files</div>
+  </div>
+
+  <!-- VNC Panel -->
+  <div class="panel active" id="panel-vnc">
+    <div id="vnc-wrap">
+      <div class="overlay hidden" id="ov-conn">
+        <div class="spinner"></div>
+        <div class="overlay-title" id="conn-msg">Connecting...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Terminal Panel -->
+  <div class="panel" id="panel-term">
+    <div id="term-container"></div>
+  </div>
+
+  <!-- Files Panel -->
+  <div class="panel" id="panel-files">
+    <div id="files-panel">
+      <div id="files-path">
+        <button class="f-btn" id="files-up">.. up</button>
+        <span id="files-path-text">~</span>
+      </div>
+      <ul id="files-list"></ul>
+      <div id="upload-area">Drop files here or tap to upload</div>
+      <input type="file" id="upload-input" multiple hidden>
+    </div>
+  </div>
+
+  <!-- Bottom bar -->
+  <div id="bar">
+    <div id="dot"></div>
+    <span id="status-text">--</span>
+    <div class="sep"></div>
+    <button class="btn" id="btn-fs">FS</button>
+    <button class="btn" id="btn-kbd">KB</button>
+    <button class="btn" id="btn-clip">Clip</button>
+    <div class="sep"></div>
+    <button class="btn" id="btn-mic">Mic</button>
+    <button class="btn" id="btn-audio">Audio</button>
+    <button class="btn" id="btn-cam">Cam</button>
+    <div class="sep"></div>
+    <div class="mon-sel">
+      <button class="mon-btn" id="mon-1">D1</button>
+      <button class="mon-btn active" id="mon-all">All</button>
+      <button class="mon-btn" id="mon-2">D2</button>
+    </div>
+    <div class="spacer"></div>
+  </div>
+</div>
+
+<!-- D-pad -->
+<div id="dpad-wrap">
+  <div class="drow"><div class="dp ghost"></div><div class="dp" id="dp-u">&#x25B2;</div><div class="dp ghost"></div></div>
+  <div class="drow"><div class="dp" id="dp-l">&#x25C0;</div><div class="dp mid" id="dp-c">&#x25CF;<br>click</div><div class="dp" id="dp-r">&#x25B6;</div></div>
+  <div class="drow"><div class="dp ghost"></div><div class="dp" id="dp-d">&#x25BC;</div><div class="dp ghost"></div></div>
+  <div id="speed-row"><label>speed</label><input type="range" id="speed-slider" min="2" max="60" value="12"></div>
+</div>
+
+<!-- Keyboard panel -->
+<div id="kbd-panel">
+  <input id="kbd-input" type="text" placeholder="Type and press Enter..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+  <div class="key-grid">
+    <button class="k" data-key="Escape">Esc</button>
+    <button class="k" data-key="Tab">Tab</button>
+    <button class="k" data-key="Enter">Enter</button>
+    <button class="k" data-key="Backspace">Bksp</button>
+    <button class="k" data-key="ArrowUp">Up</button>
+    <button class="k" data-key="ArrowDown">Dn</button>
+    <button class="k" data-key="ArrowLeft">Lt</button>
+    <button class="k" data-key="ArrowRight">Rt</button>
+    <button class="k" data-key="ctrl+c">^C</button>
+    <button class="k" data-key="ctrl+v">^V</button>
+    <button class="k" data-key="ctrl+z">^Z</button>
+    <button class="k" data-key="ctrl+a">^A</button>
+    <button class="k" data-key="ctrl+l">^L</button>
+    <button class="k" data-key="super">Super</button>
+    <button class="k" data-key="ctrl+alt+t">Term</button>
+    <button class="k" data-key="alt+F4">Alt+F4</button>
+  </div>
+</div>
+
+<!-- Clipboard modal -->
+<div id="clip-modal">
+  <div id="clip-box">
+    <h3>Clipboard Sync</h3>
+    <textarea id="clip-textarea" placeholder="Paste here or type text to send to VNC..."></textarea>
+    <div id="clip-actions">
+      <button class="btn" id="clip-send">Send to VNC</button>
+      <button class="btn" id="clip-fetch">Get from VNC</button>
+      <button class="btn" id="clip-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+import RFB from '/novnc/core/rfb.js';
+import { Terminal } from '/xterm/lib/xterm.mjs';
+import { FitAddon } from '/xterm-fit/lib/addon-fit.mjs';
+import { WebLinksAddon } from '/xterm-weblinks/lib/addon-web-links.mjs';
+
+const $ = (id) => document.getElementById(id);
+const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
+const wsBase = `${wsProto}://${location.host}`;
+
+let toastTimer = null;
+function toast(msg, ms = 2000) {
+  $('toast').textContent = msg;
+  $('toast').classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $('toast').classList.remove('show'), ms);
+}
+function setDot(state, msg) { $('dot').className = state; $('status-text').textContent = msg; }
+function show(id) { $(id).classList.remove('hidden'); }
+function hide(id) { $(id).classList.add('hidden'); }
+function toggle(id, force) {
+  const el = $(id);
+  const on = force !== undefined ? force : !el.classList.contains('show');
+  el.classList.toggle('show', on);
+  return on;
+}
+
+// Prevent iOS rubber-band and pinch zoom
+document.addEventListener('touchmove', (e) => {
+  if (e.target.closest('#kbd-input, #clip-textarea, #speed-slider, #files-panel, #term-container')) return;
+  if (e.touches.length > 1 || !e.target.closest('#kbd-panel, #clip-modal')) e.preventDefault();
+}, { passive: false });
+let lastTap = 0;
+document.addEventListener('touchend', (e) => {
+  if (e.target.closest('#kbd-input, #clip-textarea, #term-container, #files-panel')) return;
+  const now = Date.now();
+  if (now - lastTap < 300) e.preventDefault();
+  lastTap = now;
+}, { passive: false });
+
+// ── Tab switching ────────────────────────────────────────────────────────────
+let activePanel = 'panel-vnc';
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    const pid = tab.dataset.panel;
+    $(pid).classList.add('active');
+    activePanel = pid;
+    if (pid === 'panel-term') fitTerminal();
+    if (pid === 'panel-files' && filesList.length === 0) loadFiles(currentFilesPath);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// VNC
+// ══════════════════════════════════════════════════════════════════════════════
+let rfb = null, retryTimer = null, retryCount = 0;
+let curX = 640, curY = 400, lastClipboardFromVNC = '';
+
+function connect() {
+  clearTimeout(retryTimer);
+  setDot('', 'Connecting...');
+  show('ov-conn');
+  $('conn-msg').textContent = retryCount > 0 ? `Reconnecting (#${retryCount})` : 'Connecting...';
+  try { rfb = new RFB($('vnc-wrap'), `${wsBase}/websockify`); } catch (e) { scheduleRetry('Init failed'); return; }
+  rfb.scaleViewport = true; rfb.resizeSession = false; rfb.showDotCursor = true;
+  rfb.clipViewport = false; rfb.qualityLevel = 6; rfb.compressionLevel = 2;
+  rfb.addEventListener('connect', () => { hide('ov-conn'); setDot('ok', 'Connected'); retryCount = 0; setTimeout(applyMonitorView, 200); });
+  rfb.addEventListener('disconnect', () => { setDot('err', 'Disconnected'); scheduleRetry('Reconnecting...'); });
+  rfb.addEventListener('clipboard', (e) => {
+    lastClipboardFromVNC = e.detail.text;
+    navigator.clipboard?.writeText?.(e.detail.text).catch(() => {});
+  });
+}
+function scheduleRetry(msg) {
+  show('ov-conn'); retryCount++;
+  const delay = Math.min(30000, 1000 * Math.pow(2, retryCount - 1));
+  const jitter = delay * 0.3 * (Math.random() * 2 - 1);
+  const actual = Math.round(delay + jitter);
+  $('conn-msg').textContent = `${msg} (${(actual/1000).toFixed(1)}s)`;
+  retryTimer = setTimeout(() => { try { rfb?.disconnect(); } catch(_){} rfb = null; connect(); }, actual);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !rfb) connect(); });
+document.addEventListener('paste', (e) => { const t = e.clipboardData?.getData('text/plain'); if (t && rfb) rfb.clipboardPasteFrom(t); });
+connect();
+
+// ── Monitor selector ──────────────────────────────────────────────────────
+// Display layout: D2 (X=-1920..0) | D1 (X=0..1920), both 1920x1080
+// VNC framebuffer = 3840x1080 — D2 is left half, D1 is right half
+let currentMonitor = 'all'; // 'all', '1', '2'
+
+function applyMonitorView() {
+  const wrap = $('vnc-wrap');
+  const canvas = wrap.querySelector('canvas');
+  if (!canvas) return;
+
+  // Remove old transforms
+  canvas.style.transformOrigin = '';
+  canvas.style.transform = '';
+  canvas.style.position = '';
+  canvas.style.left = '';
+  canvas.style.width = '';
+  canvas.style.height = '';
+
+  if (currentMonitor === 'all') {
+    // Default: noVNC scales both monitors to fit
+    if (rfb) { rfb.scaleViewport = true; rfb.clipViewport = false; }
+    return;
+  }
+
+  // For single monitor: use clipViewport + position the canvas
+  if (rfb) {
+    rfb.scaleViewport = false;
+    rfb.clipViewport = true;
+  }
+
+  const wrapW = wrap.clientWidth;
+  const wrapH = wrap.clientHeight;
+  // Each monitor is 1920x1080 in the 3840x1080 framebuffer
+  const monW = 1920, monH = 1080;
+  const scale = Math.min(wrapW / monW, wrapH / monH);
+
+  // D2 is left half (x=0), D1 is right half (x=1920) in framebuffer coords
+  const offsetX = currentMonitor === '2' ? 0 : monW;
+
+  canvas.style.transformOrigin = '0 0';
+  canvas.style.transform = `scale(${scale}) translate(${-offsetX}px, 0px)`;
+  canvas.style.position = 'absolute';
+  canvas.style.left = `${(wrapW - monW * scale) / 2}px`;
+}
+
+function setMonitor(mon) {
+  currentMonitor = mon;
+  document.querySelectorAll('.mon-btn').forEach(b => b.classList.remove('active'));
+  $(`mon-${mon}`).classList.add('active');
+  applyMonitorView();
+}
+
+$('mon-1').addEventListener('click', () => setMonitor('1'));
+$('mon-2').addEventListener('click', () => setMonitor('2'));
+$('mon-all').addEventListener('click', () => setMonitor('all'));
+
+// Re-apply monitor view on resize and when VNC connects
+const origResizeHandler = window.onresize;
+window.addEventListener('resize', () => { if (currentMonitor !== 'all') setTimeout(applyMonitorView, 100); });
+
+// Fullscreen
+$('btn-fs').addEventListener('click', () => {
+  const el = document.documentElement;
+  if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+    (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
+  } else {
+    (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+  }
+});
+function onFsChange() {
+  const fs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+  $('btn-fs').classList.toggle('on', fs);
+  $('dpad-wrap').classList.toggle('show', fs && activePanel === 'panel-vnc');
+}
+document.addEventListener('fullscreenchange', onFsChange);
+document.addEventListener('webkitfullscreenchange', onFsChange);
+
+// D-pad
+let dpTimer = null;
+function startMove(dx, dy) { const step = () => { const s = +$('speed-slider').value; curX = Math.max(0, curX + dx*s); curY = Math.max(0, curY + dy*s); rfb?.sendPointerEvent(curX, curY, 0); }; step(); dpTimer = setInterval(step, 50); }
+function stopMove() { clearInterval(dpTimer); dpTimer = null; }
+function bindDp(id, dx, dy) { const el = $(id); const start = (e) => { e.preventDefault(); el.classList.add('held'); startMove(dx, dy); }; const stop = () => { el.classList.remove('held'); stopMove(); }; el.addEventListener('pointerdown', start, { passive: false }); el.addEventListener('pointerup', stop); el.addEventListener('pointerleave', stop); el.addEventListener('pointercancel', stop); }
+bindDp('dp-u', 0, -1); bindDp('dp-d', 0, 1); bindDp('dp-l', -1, 0); bindDp('dp-r', 1, 0);
+$('dp-c').addEventListener('pointerdown', (e) => { e.preventDefault(); rfb?.sendPointerEvent(curX, curY, 1); });
+$('dp-c').addEventListener('pointerup', () => rfb?.sendPointerEvent(curX, curY, 0));
+
+// Keyboard
+const KEYMAP = { Escape: 0xFF1B, Tab: 0xFF09, Enter: 0xFF0D, Backspace: 0xFF08, ArrowUp: 0xFF52, ArrowDown: 0xFF54, ArrowLeft: 0xFF51, ArrowRight: 0xFF53, super: 0xFFEB };
+const CTRL = 0xFFE3, ALT = 0xFFE9, SHIFT = 0xFFE1;
+function sendSpecialKey(spec) {
+  if (!rfb) return;
+  const parts = spec.split('+'), mods = parts.slice(0, -1), key = parts.at(-1);
+  if (mods.includes('ctrl')) rfb.sendKey(CTRL, 'ControlLeft', true);
+  if (mods.includes('alt')) rfb.sendKey(ALT, 'AltLeft', true);
+  if (mods.includes('shift')) rfb.sendKey(SHIFT, 'ShiftLeft', true);
+  if (key === 'super') { rfb.sendKey(0xFFEB, 'MetaLeft', true); rfb.sendKey(0xFFEB, 'MetaLeft', false); }
+  else { const c = KEYMAP[key] ?? (key.length === 1 ? key.codePointAt(0) : key.toUpperCase().codePointAt(0)); rfb.sendKey(c, null, true); rfb.sendKey(c, null, false); }
+  if (mods.includes('shift')) rfb.sendKey(SHIFT, 'ShiftLeft', false);
+  if (mods.includes('alt')) rfb.sendKey(ALT, 'AltLeft', false);
+  if (mods.includes('ctrl')) rfb.sendKey(CTRL, 'ControlLeft', false);
+}
+function sendText(text) { if (!rfb) return; for (const ch of text) { const c = ch.codePointAt(0); rfb.sendKey(c, null, true); rfb.sendKey(c, null, false); } }
+$('btn-kbd').addEventListener('click', () => { const on = toggle('kbd-panel'); $('btn-kbd').classList.toggle('on', on); if (on) $('kbd-input').focus(); });
+$('kbd-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') { sendText($('kbd-input').value); sendSpecialKey('Enter'); $('kbd-input').value = ''; e.preventDefault(); } });
+document.querySelectorAll('.k').forEach(btn => btn.addEventListener('click', () => sendSpecialKey(btn.dataset.key)));
+
+// Clipboard modal
+$('btn-clip').addEventListener('click', () => { $('clip-textarea').value = lastClipboardFromVNC; toggle('clip-modal', true); $('clip-textarea').focus(); });
+$('clip-close').addEventListener('click', () => toggle('clip-modal', false));
+$('clip-modal').addEventListener('click', (e) => { if (e.target === $('clip-modal')) toggle('clip-modal', false); });
+$('clip-send').addEventListener('click', () => { const t = $('clip-textarea').value; if (t && rfb) { rfb.clipboardPasteFrom(t); toast('Sent to VNC'); } });
+$('clip-fetch').addEventListener('click', async () => {
+  try { $('clip-textarea').value = await navigator.clipboard.readText(); }
+  catch { $('clip-textarea').value = lastClipboardFromVNC || '(unavailable)'; }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TERMINAL (persistent shell via WebSocket + node-pty)
+// ══════════════════════════════════════════════════════════════════════════════
+const term = new Terminal({
+  cursorBlink: true,
+  fontSize: 14,
+  fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', Menlo, monospace",
+  theme: {
+    background: '#0d0d0f',
+    foreground: '#d0d0d8',
+    cursor: '#00e676',
+    selectionBackground: 'rgba(68,138,255,0.3)',
+    black: '#0d0d0f', red: '#ff5252', green: '#00e676', yellow: '#ffd740',
+    blue: '#448aff', magenta: '#e040fb', cyan: '#18ffff', white: '#d0d0d8',
+    brightBlack: '#555560', brightRed: '#ff8a80', brightGreen: '#69f0ae',
+    brightYellow: '#ffe57f', brightBlue: '#82b1ff', brightMagenta: '#ea80fc',
+    brightCyan: '#84ffff', brightWhite: '#ffffff',
+  },
+  allowProposedApi: true,
+  scrollback: 10000,
+});
+const fitAddon = new FitAddon();
+term.loadAddon(fitAddon);
+term.loadAddon(new WebLinksAddon());
+
+let termWs = null;
+let termConnected = false;
+
+function connectTerminal() {
+  if (termWs && termWs.readyState <= WebSocket.OPEN) return;
+  termWs = new WebSocket(`${wsBase}/terminal`);
+  termWs.onopen = () => {
+    termConnected = true;
+    fitTerminal();
+  };
+  termWs.onmessage = (e) => term.write(e.data);
+  termWs.onclose = () => {
+    termConnected = false;
+    setTimeout(connectTerminal, 2000);
+  };
+  termWs.onerror = () => {};
+}
+
+term.onData((data) => {
+  if (termWs?.readyState === WebSocket.OPEN) termWs.send(data);
+});
+
+function fitTerminal() {
+  if (activePanel !== 'panel-term') return;
+  try {
+    fitAddon.fit();
+    if (termWs?.readyState === WebSocket.OPEN) {
+      termWs.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+    }
+  } catch (_) {}
+}
+
+term.open($('term-container'));
+connectTerminal();
+window.addEventListener('resize', fitTerminal);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FILE BROWSER
+// ══════════════════════════════════════════════════════════════════════════════
+let currentFilesPath = '';  // Will be set from server's HOME
+let filesList = [];
+
+// Detect initial path from server
+async function initFilesPath() {
+  try {
+    const res = await fetch('/api/files');
+    const data = await res.json();
+    if (data.path) currentFilesPath = data.path;
+  } catch (_) {}
+}
+initFilesPath();
+
+async function loadFiles(dir) {
+  if (!dir) {
+    // First load - let server decide the default
+    try {
+      const res = await fetch('/api/files');
+      const data = await res.json();
+      if (data.error) { toast(data.error); return; }
+      filesList = data.items;
+      currentFilesPath = data.path;
+      $('files-path-text').textContent = data.path;
+      renderFiles();
+      return;
+    } catch (e) { toast('Failed to load files'); return; }
+  }
+  currentFilesPath = dir;
+  $('files-path-text').textContent = dir;
+  try {
+    const res = await fetch(`/api/files?path=${encodeURIComponent(dir)}`);
+    const data = await res.json();
+    if (data.error) { toast(data.error); return; }
+    filesList = data.items;
+    currentFilesPath = data.path;
+    $('files-path-text').textContent = data.path;
+    renderFiles();
+  } catch (e) { toast('Failed to load files'); }
+}
+
+function renderFiles() {
+  const ul = $('files-list');
+  ul.innerHTML = '';
+  for (const item of filesList) {
+    const li = document.createElement('li');
+    const icon = item.type === 'dir' ? '&#x1F4C1;' : item.type === 'link' ? '&#x1F517;' : '&#x1F4C4;';
+    li.innerHTML = `<span class="f-icon">${icon}</span><span class="f-name">${esc(item.name)}</span>`;
+    if (item.type === 'dir') {
+      li.addEventListener('click', () => loadFiles(item.path));
+    } else {
+      const actions = document.createElement('span');
+      actions.className = 'f-actions';
+      const dlBtn = document.createElement('button');
+      dlBtn.className = 'f-btn'; dlBtn.textContent = 'DL';
+      dlBtn.addEventListener('click', (e) => { e.stopPropagation(); downloadFile(item.path); });
+      actions.appendChild(dlBtn);
+      li.appendChild(actions);
+      li.addEventListener('click', () => previewFile(item.path, item.name));
+    }
+    ul.appendChild(li);
+  }
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function downloadFile(filePath) {
+  const a = document.createElement('a');
+  a.href = `/api/files/download?path=${encodeURIComponent(filePath)}`;
+  a.download = '';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+async function previewFile(filePath, name) {
+  try {
+    const res = await fetch(`/api/files/read?path=${encodeURIComponent(filePath)}`);
+    const data = await res.json();
+    if (data.error) { toast(data.error); return; }
+    $('clip-textarea').value = data.content;
+    $('clip-box').querySelector('h3').textContent = name;
+    toggle('clip-modal', true);
+  } catch { toast('Cannot read file'); }
+}
+
+$('files-up').addEventListener('click', () => {
+  // Handle both Windows (C:\foo\bar) and Unix (/foo/bar) paths
+  const p = currentFilesPath;
+  let parent;
+  if (p.includes('\\')) {
+    // Windows path
+    const parts = p.split('\\').filter(Boolean);
+    if (parts.length <= 1) parent = p.slice(0, 3); // e.g., "C:\"
+    else parent = parts.slice(0, -1).join('\\');
+    // Ensure drive letter has backslash
+    if (parent.length === 2 && parent[1] === ':') parent += '\\';
+  } else {
+    parent = p.split('/').slice(0, -1).join('/') || '/';
+  }
+  loadFiles(parent);
+});
+
+// Upload
+const uploadArea = $('upload-area');
+const uploadInput = $('upload-input');
+uploadArea.addEventListener('click', () => uploadInput.click());
+uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('drag'); });
+uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag'));
+uploadArea.addEventListener('drop', (e) => { e.preventDefault(); uploadArea.classList.remove('drag'); handleUpload(e.dataTransfer.files); });
+uploadInput.addEventListener('change', () => { handleUpload(uploadInput.files); uploadInput.value = ''; });
+
+async function handleUpload(files) {
+  // Detect path separator from current path
+  const sep = currentFilesPath.includes('\\') ? '\\' : '/';
+  for (const file of files) {
+    const dest = `${currentFilesPath}${sep}${file.name}`;
+    try {
+      const buf = await file.arrayBuffer();
+      const res = await fetch(`/api/files/upload?path=${encodeURIComponent(dest)}`, {
+        method: 'PUT', body: buf,
+      });
+      const data = await res.json();
+      if (data.ok) toast(`Uploaded ${file.name}`);
+      else toast(`Upload failed: ${data.error}`);
+    } catch (e) { toast(`Upload error: ${e.message}`); }
+  }
+  loadFiles(currentFilesPath);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// AUDIO & CAMERA
+// ══════════════════════════════════════════════════════════════════════════════
+let micActive = false, micWs = null, micCtx = null, micStream = null, micWorklet = null;
+async function startMic() {
+  micStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: 16000, echoCancellation: false, noiseSuppression: false, autoGainControl: true, latency: 0 } });
+  micCtx = new AudioContext({ sampleRate: 16000, latencyHint: 'interactive' });
+  await micCtx.resume();
+  const src = micCtx.createMediaStreamSource(micStream);
+  if (micCtx.audioWorklet) {
+    try {
+      await micCtx.audioWorklet.addModule('/pcm-worklet.js');
+      micWorklet = new AudioWorkletNode(micCtx, 'pcm-processor');
+      micWs = new WebSocket(`${wsBase}/audio-in`);
+      micWs.binaryType = 'arraybuffer';
+      micWs.onclose = () => { if (micActive) stopMic(); };
+      micWorklet.port.onmessage = ({ data }) => { if (micWs?.readyState === WebSocket.OPEN) micWs.send(data); };
+      src.connect(micWorklet); micWorklet.connect(micCtx.destination);
+      return;
+    } catch (e) { console.warn('[mic] Worklet fail, using ScriptProcessor'); }
+  }
+  const proc = micCtx.createScriptProcessor(256, 1, 1);
+  micWorklet = proc;
+  micWs = new WebSocket(`${wsBase}/audio-in`);
+  micWs.binaryType = 'arraybuffer';
+  micWs.onclose = () => { if (micActive) stopMic(); };
+  src.connect(proc); proc.connect(micCtx.destination);
+  proc.onaudioprocess = ({ inputBuffer }) => {
+    if (micWs?.readyState !== WebSocket.OPEN) return;
+    const f32 = inputBuffer.getChannelData(0);
+    const i16 = new Int16Array(f32.length);
+    for (let i = 0; i < f32.length; i++) i16[i] = Math.max(-32768, Math.min(32767, f32[i] * 32767));
+    micWs.send(i16.buffer);
+  };
+}
+function stopMic() {
+  micWorklet?.disconnect?.(); micWorklet?.port?.close?.();
+  micStream?.getTracks().forEach(t => t.stop());
+  micCtx?.close().catch(() => {}); micWs?.close();
+  micWorklet = micStream = micCtx = micWs = null;
+  micActive = false; $('btn-mic').classList.remove('on'); $('btn-mic').textContent = 'Mic';
+}
+$('btn-mic').addEventListener('click', async () => {
+  if (!micActive) {
+    try { await startMic(); micActive = true; $('btn-mic').classList.add('on'); $('btn-mic').textContent = 'Mic ON'; toast('Mic relay active'); }
+    catch (e) { console.error('[mic] getUserMedia error:', e); toast(`Mic: ${e.name} - ${e.message}`); }
+  } else { stopMic(); }
+});
+
+let audioActive = false, audioWs = null, audioCtx = null, audioNextTime = 0;
+$('btn-audio').addEventListener('click', async () => {
+  if (!audioActive) {
+    audioCtx = new AudioContext({ sampleRate: 44100 }); await audioCtx.resume();
+    audioNextTime = audioCtx.currentTime + 0.1;
+    audioWs = new WebSocket(`${wsBase}/audio-out`); audioWs.binaryType = 'arraybuffer';
+    audioWs.onmessage = ({ data }) => {
+      const i16 = new Int16Array(data), samples = i16.length / 2;
+      const buf = audioCtx.createBuffer(2, samples, 44100);
+      const ch0 = buf.getChannelData(0), ch1 = buf.getChannelData(1);
+      for (let i = 0; i < samples; i++) { ch0[i] = i16[i*2] / 32767; ch1[i] = i16[i*2+1] / 32767; }
+      const src = audioCtx.createBufferSource(); src.buffer = buf; src.connect(audioCtx.destination);
+      const now = audioCtx.currentTime; if (audioNextTime < now + 0.02) audioNextTime = now + 0.1;
+      src.start(audioNextTime); audioNextTime += buf.duration;
+    };
+    audioWs.onclose = () => { if (audioActive) { audioActive = false; $('btn-audio').classList.remove('on'); $('btn-audio').textContent = 'Audio'; } };
+    audioActive = true; $('btn-audio').classList.add('on'); $('btn-audio').textContent = 'Audio ON'; toast('System audio streaming');
+  } else {
+    audioWs?.close(); audioCtx?.close().catch(() => {}); audioWs = audioCtx = null;
+    audioActive = false; $('btn-audio').classList.remove('on'); $('btn-audio').textContent = 'Audio';
+  }
+});
+
+let camActive = false, camWs = null, camStream = null, camLoop = false;
+$('btn-cam').addEventListener('click', async () => {
+  if (!camActive) {
+    try {
+      try { camStream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15 }, facingMode: 'environment' } }); }
+      catch (ce) { if (ce.name === 'OverconstrainedError' || ce.name === 'NotFoundError') camStream = await navigator.mediaDevices.getUserMedia({ video: true }); else throw ce; }
+      const video = document.createElement('video'); video.srcObject = camStream; video.playsInline = true; video.muted = true;
+      video.setAttribute('playsinline', ''); video.setAttribute('webkit-playsinline', ''); await video.play();
+      const canvas = document.createElement('canvas'); canvas.width = 640; canvas.height = 480; const ctx2d = canvas.getContext('2d');
+      camWs = new WebSocket(`${wsBase}/camera`); camWs.binaryType = 'arraybuffer'; camLoop = true;
+      async function loop() { while (camLoop) { if (camWs.readyState === WebSocket.OPEN) { ctx2d.drawImage(video, 0, 0, 640, 480); const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.80)); if (blob && camWs.readyState === WebSocket.OPEN) camWs.send(await blob.arrayBuffer()); } await new Promise(r => setTimeout(r, 67)); } }
+      camWs.onopen = () => loop(); camWs.onclose = () => { camLoop = false; };
+      camActive = true; $('btn-cam').classList.add('on'); $('btn-cam').textContent = 'Cam ON'; toast('Camera relay active');
+    } catch (e) { console.error('[cam] getUserMedia error:', e); toast(`Cam: ${e.name} - ${e.message}`); }
+  } else {
+    camLoop = false; camWs?.close(); camStream?.getTracks().forEach(t => t.stop());
+    camWs = camStream = null; camActive = false; $('btn-cam').classList.remove('on'); $('btn-cam').textContent = 'Cam';
+  }
+});
+
+// Service worker
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+</script>
+</body>
+</html>
