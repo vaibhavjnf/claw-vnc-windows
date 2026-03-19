@@ -1,0 +1,3 @@
+## 2024-03-19 - Buffer Concatenation in High-Throughput Proxies
+**Learning:** In proxy servers (like the VNC proxy in `server.js`), concatenating incoming `Buffer` chunks before processing them is fine for the authentication/handshake phase. However, leaving this in place during the high-throughput `proxy` phase causes severe performance degradation due to constant memory allocation and copying (`Buffer.concat()`).
+**Action:** When a proxy transitions into an established state, incoming `data` events should be passed directly to the outgoing socket stream without any intermediate buffering or array concatenation.

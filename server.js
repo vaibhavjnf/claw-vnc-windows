@@ -585,7 +585,15 @@ vncWss.on('connection', (ws) => {
   }
 
   tcp.on('connect', () => console.log(`[vnc] TCP :${VNC_PORT} connected`));
-  tcp.on('data', (d) => { tcpBuf = Buffer.concat([tcpBuf, d]); processTcp(); });
+  tcp.on('data', (d) => {
+    // ⚡ Bolt optimization: send proxy data directly without allocating/copying buffers
+    if (phase === 'proxy') {
+      wsSend(d);
+    } else {
+      tcpBuf = Buffer.concat([tcpBuf, d]);
+      processTcp();
+    }
+  });
   tcp.on('close', () => cleanup('VNC server closed'));
   tcp.on('error', (e) => cleanup(`TCP error: ${e.message}`));
 
@@ -969,7 +977,15 @@ function makeTcpVncProxy(clientSock) {
   }
 
   tcp.on('connect', () => console.log(`[vnc-tcp] upstream :${VNC_PORT} connected`));
-  tcp.on('data',  (d) => { tcpBuf = Buffer.concat([tcpBuf, d]); processTcp(); });
+  tcp.on('data',  (d) => {
+    // ⚡ Bolt optimization: bypass buffer concatenation during heavy proxy phase
+    if (phase === 'proxy') {
+      toClient(d);
+    } else {
+      tcpBuf = Buffer.concat([tcpBuf, d]);
+      processTcp();
+    }
+  });
   tcp.on('close', () => cleanup('upstream closed'));
   tcp.on('error', (e) => cleanup(`upstream error: ${e.message}`));
 
