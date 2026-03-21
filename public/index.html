@@ -167,6 +167,7 @@
     <div class="tab active" data-panel="panel-vnc">Desktop</div>
     <div class="tab" data-panel="panel-term">Terminal</div>
     <div class="tab" data-panel="panel-files">Files</div>
+    <div class="tab" data-panel="panel-windows">Win</div>
   </div>
 
   <!-- VNC Panel -->
@@ -194,6 +195,18 @@
       <ul id="files-list"></ul>
       <div id="upload-area">Drop files here or tap to upload</div>
       <input type="file" id="upload-input" multiple hidden>
+    </div>
+  </div>
+
+  <!-- Windows Panel -->
+  <div class="panel" id="panel-windows">
+    <div style="display:flex;flex-direction:column;gap:10px;padding:12px;height:100%;box-sizing:border-box;">
+      <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">
+        <button class="btn" id="win-refresh">Refresh</button>
+        <span id="win-status" style="color:var(--muted);font-size:12px;">Select a window to stream</span>
+      </div>
+      <div id="win-list" style="display:flex;flex-direction:column;gap:5px;overflow-y:auto;max-height:150px;flex-shrink:0;"></div>
+      <canvas id="win-canvas" style="flex:1;width:100%;min-height:0;border:1px solid #333;border-radius:6px;background:#000;cursor:crosshair;"></canvas>
     </div>
   </div>
 
@@ -317,6 +330,8 @@ document.querySelectorAll('.tab').forEach(tab => {
     activePanel = pid;
     if (pid === 'panel-term') fitTerminal();
     if (pid === 'panel-files' && filesList.length === 0) loadFiles(currentFilesPath);
+    if (pid === 'panel-windows') loadWindows();
+    if (pid !== 'panel-windows' && winWs) { winWs.close(); winWs = null; winActive = false; }
   });
 });
 
@@ -735,6 +750,141 @@ $('btn-cam').addEventListener('click', async () => {
 
 // Service worker
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+
+// ── Window stream & control ───────────────────────────────────────────────────
+let winWs     = null;
+let winActive = false; // currently streaming
+
+async function loadWindows() {
+  $('win-status').textContent = 'Loading...';
+  try {
+    const res  = await fetch('/api/windows');
+    const list = await res.json();
+    const container = $('win-list');
+    container.innerHTML = '';
+    if (!list.length) { $('win-status').textContent = 'No windows found'; return; }
+    list.forEach(w => {
+      const btn = document.createElement('button');
+      btn.className = 'btn';
+      btn.style.cssText = 'text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;';
+      btn.title = `${w.title} — ${w.appName}`;
+      btn.textContent = `${w.title} (${w.appName})`;
+      btn.onclick = () => startWindowStream(w.id);
+      container.appendChild(btn);
+    });
+    $('win-status').textContent = `${list.length} windows found`;
+  } catch (e) {
+    $('win-status').textContent = 'Error: ' + e.message;
+  }
+}
+
+function startWindowStream(windowId) {
+  if (winWs) { winWs.close(); winWs = null; }
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  winWs = new WebSocket(`${proto}://${location.host}/window-stream`);
+  winWs.binaryType = 'arraybuffer';
+
+  winWs.onopen = () => {
+    winWs.send(JSON.stringify({ id: windowId }));
+    $('win-status').textContent = 'Streaming...';
+    winActive = true;
+  };
+
+  const canvas = $('win-canvas');
+  const ctx    = canvas.getContext('2d');
+
+  winWs.onmessage = (e) => {
+    if (typeof e.data === 'string') {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.error) $('win-status').textContent = 'Error: ' + msg.error;
+      } catch {}
+      return;
+    }
+    const blob = new Blob([e.data], { type: 'image/jpeg' });
+    const url  = URL.createObjectURL(blob);
+    const img  = new Image();
+    img.onload = () => {
+      canvas.width  = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  };
+
+  winWs.onclose = () => {
+    winActive = false;
+    if ($('win-status').textContent === 'Streaming...') $('win-status').textContent = 'Disconnected';
+  };
+  winWs.onerror = () => { $('win-status').textContent = 'Connection error'; };
+}
+
+$('win-refresh').addEventListener('click', loadWindows);
+
+// ── Window canvas mouse/keyboard control ─────────────────────────────────────
+function sendWinCtrl(msg) {
+  if (winWs && winWs.readyState === 1) winWs.send(JSON.stringify(msg));
+}
+
+function canvasCoords(e) {
+  const rect = $('win-canvas').getBoundingClientRect();
+  const scaleX = ($('win-canvas').width  || rect.width)  / rect.width;
+  const scaleY = ($('win-canvas').height || rect.height) / rect.height;
+  return {
+    x: Math.round((e.clientX - rect.left) * scaleX),
+    y: Math.round((e.clientY - rect.top)  * scaleY),
+  };
+}
+
+const winCanvas = $('win-canvas');
+winCanvas.addEventListener('mousemove', (e) => {
+  if (!winActive) return;
+  const {x, y} = canvasCoords(e);
+  sendWinCtrl({ type: 'mouse_move', x, y });
+});
+winCanvas.addEventListener('mousedown', (e) => {
+  if (!winActive) return;
+  e.preventDefault();
+  const {x, y} = canvasCoords(e);
+  sendWinCtrl({ type: 'mouse_down', x, y, button: e.button === 2 ? 'right' : 'left' });
+});
+winCanvas.addEventListener('mouseup', (e) => {
+  if (!winActive) return;
+  const {x, y} = canvasCoords(e);
+  sendWinCtrl({ type: 'mouse_up', x, y, button: e.button === 2 ? 'right' : 'left' });
+});
+winCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
+winCanvas.addEventListener('wheel', (e) => {
+  if (!winActive) return;
+  e.preventDefault();
+  const {x, y} = canvasCoords(e);
+  sendWinCtrl({ type: 'scroll', x, y, delta: -e.deltaY / 100 });
+}, { passive: false });
+
+// Keyboard: capture when canvas is focused (click to focus)
+winCanvas.setAttribute('tabindex', '0');
+winCanvas.addEventListener('keydown', (e) => {
+  if (!winActive) return;
+  e.preventDefault();
+  // Map common keys to SendKeys format
+  const keyMap = {
+    Enter: '{ENTER}', Backspace: '{BACKSPACE}', Delete: '{DELETE}',
+    Escape: '{ESC}', Tab: '{TAB}', ArrowUp: '{UP}', ArrowDown: '{DOWN}',
+    ArrowLeft: '{LEFT}', ArrowRight: '{RIGHT}', Home: '{HOME}', End: '{END}',
+    PageUp: '{PGUP}', PageDown: '{PGDN}', F1: '{F1}', F2: '{F2}',
+    F3: '{F3}', F4: '{F4}', F5: '{F5}', F10: '{F10}',
+    ' ': ' ',
+  };
+  const mapped = keyMap[e.key];
+  if (mapped) {
+    sendWinCtrl({ type: 'key', keys: mapped });
+  } else if (e.ctrlKey && e.key.length === 1) {
+    sendWinCtrl({ type: 'key', keys: `^${e.key}` }); // Ctrl+key
+  } else if (e.key.length === 1) {
+    sendWinCtrl({ type: 'key', keys: e.key });
+  }
+});
 </script>
 </body>
 </html>

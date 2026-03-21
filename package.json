@@ -18,6 +18,7 @@
     "des.js": "^1.1.0",
     "express": "^5.2.1",
     "node-pty": "^1.1.0",
+    "node-screenshots": "^0.2.8",
     "ws": "^8.19.0"
   }
 }

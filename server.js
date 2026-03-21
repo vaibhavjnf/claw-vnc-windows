@@ -9,7 +9,7 @@ const DES       = require('des.js');
 const pty       = require('node-pty');
 const fs        = require('fs');
 const os        = require('os');
-const { spawn, execSync } = require('child_process');
+const { spawn, execSync, execFile } = require('child_process');
 const path      = require('path');
 
 // ── Platform detection ───────────────────────────────────────────────────────
@@ -836,6 +836,135 @@ app.get('/camera-preview', (req, res) => {
   req.on('close', () => mjpegClients.delete(res));
 });
 
+// ── Window capture & control (Windows-only) ──────────────────────────────────
+let psCtrlProc = null;
+
+function ensureControlProcess() {
+  if (psCtrlProc && !psCtrlProc.killed) return psCtrlProc;
+  // Persistent PowerShell that reads pipe-delimited control commands from stdin
+  const initScript = [
+    'Add-Type -TypeDefinition @\'',
+    'using System;',
+    'using System.Runtime.InteropServices;',
+    'public class WinCtrl {',
+    '  [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);',
+    '  [DllImport("user32.dll")] public static extern void mouse_event(uint f, int dx, int dy, uint d, IntPtr e);',
+    '  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);',
+    '  public const uint LD=2,LU=4,RD=8,RU=16,SCROLL=0x0800;',
+    '}',
+    '\'@ -ErrorAction SilentlyContinue',
+    '$sh = New-Object -ComObject WScript.Shell',
+    'while($line = [Console]::ReadLine()) {',
+    '  $p = $line -split "\\|"',
+    '  try {',
+    '    switch($p[0]) {',
+    '      "FOCUS"  { [WinCtrl]::SetForegroundWindow([IntPtr][long]$p[1]) }',
+    '      "MOVE"   { [WinCtrl]::SetCursorPos([int]$p[1],[int]$p[2]) }',
+    '      "LDOWN"  { [WinCtrl]::SetCursorPos([int]$p[1],[int]$p[2]); [WinCtrl]::mouse_event([WinCtrl]::LD,0,0,0,[IntPtr]::Zero) }',
+    '      "LUP"    { [WinCtrl]::SetCursorPos([int]$p[1],[int]$p[2]); [WinCtrl]::mouse_event([WinCtrl]::LU,0,0,0,[IntPtr]::Zero) }',
+    '      "RDOWN"  { [WinCtrl]::SetCursorPos([int]$p[1],[int]$p[2]); [WinCtrl]::mouse_event([WinCtrl]::RD,0,0,0,[IntPtr]::Zero) }',
+    '      "RUP"    { [WinCtrl]::SetCursorPos([int]$p[1],[int]$p[2]); [WinCtrl]::mouse_event([WinCtrl]::RU,0,0,0,[IntPtr]::Zero) }',
+    '      "SCROLL" { [WinCtrl]::SetCursorPos([int]$p[1],[int]$p[2]); [WinCtrl]::mouse_event([WinCtrl]::SCROLL,0,0,[uint][int]$p[3],[IntPtr]::Zero) }',
+    '      "KEYS"   { $sh.SendKeys($p[1]) }',
+    '    }',
+    '  } catch {}',
+    '}',
+  ].join('\n');
+  psCtrlProc = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', initScript], {
+    stdio: ['pipe', 'ignore', 'ignore'],
+  });
+  psCtrlProc.on('close', () => { psCtrlProc = null; });
+  psCtrlProc.on('error', () => { psCtrlProc = null; });
+  return psCtrlProc;
+}
+
+function sendCtrl(cmd) {
+  if (!IS_WIN) return;
+  const ps = ensureControlProcess();
+  if (ps?.stdin?.writable) ps.stdin.write(cmd + '\n');
+}
+
+// ── /api/windows — list capturable windows ───────────────────────────────────
+app.get('/api/windows', (req, res) => {
+  try {
+    const { Window } = require('node-screenshots');
+    const windows = Window.all()
+      .filter(w => w.title()?.trim() && !w.isMinimized())
+      .map(w => ({
+        id:      w.id(),
+        title:   w.title(),
+        appName: w.appName(),
+        x: w.x(), y: w.y(), width: w.width(), height: w.height(),
+      }));
+    res.json(windows);
+  } catch (e) {
+    console.error('[win] enumerate error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── /window-stream WebSocket — stream & control a specific window ─────────────
+const windowStreamWss = new WebSocket.Server({ noServer: true });
+
+windowStreamWss.on('connection', (ws) => {
+  console.log('[win-stream] browser connected');
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true; });
+
+  let streaming = false;
+  let winPos    = null; // { x, y, width, height } cached for coord translation
+
+  ws.on('message', async (data) => {
+    let msg;
+    try { msg = JSON.parse(data.toString()); } catch { return; }
+
+    if (!streaming && msg.id !== undefined) {
+      // First message — begin stream loop
+      streaming = true;
+      const targetId = msg.id;
+      if (IS_WIN) sendCtrl(`FOCUS|${targetId}`);
+
+      ;(async () => {
+        const { Window } = require('node-screenshots');
+        while (streaming && ws.readyState === 1) {
+          try {
+            const w = Window.all().find(ww => ww.id() === targetId);
+            if (!w) { ws.send(JSON.stringify({ error: 'window_not_found' })); break; }
+            winPos = { x: w.x(), y: w.y(), width: w.width(), height: w.height() };
+            const image = await w.captureImage();
+            const jpeg  = image.toJpegSync();
+            if (ws.readyState === 1) ws.send(jpeg);
+          } catch (e) {
+            console.error('[win-stream] capture error:', e.message);
+            break;
+          }
+          await new Promise(r => setTimeout(r, 66)); // ~15 fps
+        }
+        streaming = false;
+      })();
+      return;
+    }
+
+    // Control events
+    if (!winPos || !IS_WIN) return;
+    const sx = winPos.x + Math.round(msg.x ?? 0);
+    const sy = winPos.y + Math.round(msg.y ?? 0);
+    switch (msg.type) {
+      case 'mouse_move':  sendCtrl(`MOVE|${sx}|${sy}`); break;
+      case 'mouse_down':  sendCtrl(`${msg.button === 'right' ? 'RDOWN' : 'LDOWN'}|${sx}|${sy}`); break;
+      case 'mouse_up':    sendCtrl(`${msg.button === 'right' ? 'RUP'   : 'LUP'  }|${sx}|${sy}`); break;
+      case 'scroll':      sendCtrl(`SCROLL|${sx}|${sy}|${Math.round((msg.delta ?? 1) * 120)}`); break;
+      case 'key':         if (msg.keys) sendCtrl(`KEYS|${msg.keys}`); break;
+    }
+  });
+
+  ws.on('close', () => {
+    streaming = false;
+    console.log('[win-stream] browser disconnected');
+  });
+  ws.on('error', (e) => console.error('[win-stream] ws error:', e.message));
+});
+
 // ── Direct TCP VNC proxy on :5900 (full-colour, 32bpp forced) ────────────────
 const VNC_PROXY_PORT = IS_WIN ? 5950 : 5900;  // Avoid conflict with VNC server on Windows
 
@@ -1070,7 +1199,7 @@ termWss.on('connection', (ws) => {
 
 // ── WebSocket keepalive ping/pong ────────────────────────────────────────────
 const wsKeepalive = setInterval(() => {
-  for (const wss of [vncWss, audioInWss, audioOutWss, cameraWss, termWss]) {
+  for (const wss of [vncWss, audioInWss, audioOutWss, cameraWss, termWss, windowStreamWss]) {
     wss.clients.forEach((ws) => {
       if (ws.isAlive === false) return ws.terminate();
       ws.isAlive = false;
@@ -1081,11 +1210,12 @@ const wsKeepalive = setInterval(() => {
 
 // ── WebSocket routing ────────────────────────────────────────────────────────
 const wsRoutes = {
-  '/websockify': vncWss,
-  '/audio-in':   audioInWss,
-  '/audio-out':  audioOutWss,
-  '/camera':     cameraWss,
-  '/terminal':   termWss,
+  '/websockify':    vncWss,
+  '/audio-in':      audioInWss,
+  '/audio-out':     audioOutWss,
+  '/camera':        cameraWss,
+  '/terminal':      termWss,
+  '/window-stream': windowStreamWss,
 };
 
 server.on('upgrade', (req, socket, head) => {
@@ -1126,13 +1256,12 @@ server.listen(PORT, BIND_HOST, () => {
 // ── Cleanup on exit ──────────────────────────────────────────────────────────
 function shutdown() {
   clearInterval(wsKeepalive);
-  for (const wss of [vncWss, audioInWss, audioOutWss, cameraWss, termWss]) {
+  for (const wss of [vncWss, audioInWss, audioOutWss, cameraWss, termWss, windowStreamWss]) {
     wss.clients.forEach((ws) => ws.close());
   }
   stopFFmpeg();
-  if (persistentPty && !persistentPty.killed) {
-    persistentPty.kill();
-  }
+  if (persistentPty && !persistentPty.killed) persistentPty.kill();
+  if (psCtrlProc && !psCtrlProc.killed) psCtrlProc.kill();
   server.close();
   process.exit(0);
 }
