@@ -354,48 +354,29 @@ document.addEventListener('paste', (e) => { const t = e.clipboardData?.getData('
 connect();
 
 // ── Monitor selector ──────────────────────────────────────────────────────
-// Display layout: D2 (X=-1920..0) | D1 (X=0..1920), both 1920x1080
 // VNC framebuffer = 3840x1080 — D2 is left half, D1 is right half
-let currentMonitor = 'all'; // 'all', '1', '2'
+// Simple approach: always use scaleViewport=true, CSS scale(2) + origin to zoom into half
+let currentMonitor = 'all';
 
 function applyMonitorView() {
   const wrap = $('vnc-wrap');
-  const canvas = wrap.querySelector('canvas');
-  if (!canvas) return;
-
-  // Remove old transforms
-  canvas.style.transformOrigin = '';
-  canvas.style.transform = '';
-  canvas.style.position = '';
-  canvas.style.left = '';
-  canvas.style.width = '';
-  canvas.style.height = '';
+  if (!rfb) return;
+  // Always let noVNC handle scaling to fit
+  rfb.scaleViewport = true;
+  rfb.clipViewport = false;
 
   if (currentMonitor === 'all') {
-    // Default: noVNC scales both monitors to fit
-    if (rfb) { rfb.scaleViewport = true; rfb.clipViewport = false; }
-    return;
+    wrap.style.transform = '';
+    wrap.style.transformOrigin = '';
+  } else if (currentMonitor === '1') {
+    // D1 = right half of framebuffer → origin at center of right half (75% 50%)
+    wrap.style.transformOrigin = '75% 50%';
+    wrap.style.transform = 'scale(2)';
+  } else {
+    // D2 = left half of framebuffer → origin at center of left half (25% 50%)
+    wrap.style.transformOrigin = '25% 50%';
+    wrap.style.transform = 'scale(2)';
   }
-
-  // For single monitor: use clipViewport + position the canvas
-  if (rfb) {
-    rfb.scaleViewport = false;
-    rfb.clipViewport = true;
-  }
-
-  const wrapW = wrap.clientWidth;
-  const wrapH = wrap.clientHeight;
-  // Each monitor is 1920x1080 in the 3840x1080 framebuffer
-  const monW = 1920, monH = 1080;
-  const scale = Math.min(wrapW / monW, wrapH / monH);
-
-  // D2 is left half (x=0), D1 is right half (x=1920) in framebuffer coords
-  const offsetX = currentMonitor === '2' ? 0 : monW;
-
-  canvas.style.transformOrigin = '0 0';
-  canvas.style.transform = `scale(${scale}) translate(${-offsetX}px, 0px)`;
-  canvas.style.position = 'absolute';
-  canvas.style.left = `${(wrapW - monW * scale) / 2}px`;
 }
 
 function setMonitor(mon) {
@@ -409,8 +390,6 @@ $('mon-1').addEventListener('click', () => setMonitor('1'));
 $('mon-2').addEventListener('click', () => setMonitor('2'));
 $('mon-all').addEventListener('click', () => setMonitor('all'));
 
-// Re-apply monitor view on resize and when VNC connects
-const origResizeHandler = window.onresize;
 window.addEventListener('resize', () => { if (currentMonitor !== 'all') setTimeout(applyMonitorView, 100); });
 
 // Fullscreen
