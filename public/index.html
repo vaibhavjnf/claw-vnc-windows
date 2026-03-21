@@ -158,6 +158,113 @@
     /* ── Toast ── */
     #toast { position: fixed; top: calc(16px + var(--sai-top)); left: 50%; transform: translateX(-50%) translateY(-120%); background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 8px 16px; border-radius: 8px; font-size: 12px; z-index: 300; transition: transform .3s ease; pointer-events: none; }
     #toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* ── Ask Claude FAB ── */
+    #ask-fab {
+      position: absolute; bottom: 16px; right: 16px;
+      width: 48px; height: 48px; border-radius: 50%;
+      background: linear-gradient(135deg, #6e40c9 0%, #9b5de5 50%, #c77dff 100%);
+      border: none; cursor: pointer; z-index: 90;
+      display: none; align-items: center; justify-content: center;
+      box-shadow: 0 4px 20px rgba(110,64,201,0.5), 0 0 0 0 rgba(155,93,229,0.4);
+      transition: transform .2s cubic-bezier(.34,1.56,.64,1), box-shadow .2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #ask-fab.visible { display: flex; }
+    #ask-fab:hover { transform: scale(1.1); box-shadow: 0 6px 28px rgba(110,64,201,0.7), 0 0 0 6px rgba(155,93,229,0.15); }
+    #ask-fab:active { transform: scale(0.94); }
+    #ask-fab svg { width: 22px; height: 22px; }
+
+    /* ── Ask Claude Bottom Sheet ── */
+    #ask-sheet-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      z-index: 400; opacity: 0; pointer-events: none;
+      transition: opacity .3s ease;
+      backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    }
+    #ask-sheet-overlay.open { opacity: 1; pointer-events: all; }
+
+    #ask-sheet {
+      position: fixed; left: 0; right: 0; bottom: 0;
+      background: rgba(22,22,26,0.96);
+      border-top: 1px solid rgba(255,255,255,0.08);
+      border-radius: 20px 20px 0 0;
+      padding: 0 0 max(24px, var(--sai-bottom)) 0;
+      z-index: 401;
+      transform: translateY(100%);
+      transition: transform .4s cubic-bezier(.32,0.72,0,1);
+      box-shadow: 0 -8px 48px rgba(0,0,0,0.6);
+      max-height: 80dvh; display: flex; flex-direction: column;
+    }
+    #ask-sheet.open { transform: translateY(0); }
+
+    #ask-handle-row {
+      display: flex; align-items: center; justify-content: center;
+      padding: 12px 0 4px; flex-shrink: 0;
+    }
+    #ask-handle {
+      width: 36px; height: 4px; border-radius: 2px;
+      background: rgba(255,255,255,0.2); cursor: grab;
+    }
+
+    #ask-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 20px 12px; flex-shrink: 0;
+    }
+    #ask-header-icon {
+      width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
+      background: linear-gradient(135deg, #6e40c9, #c77dff);
+      display: flex; align-items: center; justify-content: center;
+    }
+    #ask-header-icon svg { width: 18px; height: 18px; }
+    #ask-title { font-size: 15px; font-weight: 600; color: #fff; letter-spacing: -0.3px; }
+    #ask-subtitle { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 1px; }
+
+    #ask-response {
+      flex: 1; overflow-y: auto; padding: 0 20px 12px;
+      font-size: 14px; line-height: 1.65; color: rgba(255,255,255,0.85);
+      -webkit-overflow-scrolling: touch; touch-action: pan-y;
+      min-height: 60px; max-height: 40dvh;
+    }
+    #ask-response:empty::before { content: 'Ask anything about what you see on screen…'; color: rgba(255,255,255,0.25); font-style: italic; }
+    #ask-response p { margin: 0 0 10px; }
+    #ask-response p:last-child { margin-bottom: 0; }
+
+    .ask-cursor {
+      display: inline-block; width: 2px; height: 1em;
+      background: #9b5de5; vertical-align: text-bottom;
+      animation: blink .7s step-end infinite; margin-left: 1px;
+    }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+
+    #ask-input-row {
+      display: flex; gap: 10px; align-items: flex-end;
+      padding: 10px 16px 0; flex-shrink: 0;
+      border-top: 1px solid rgba(255,255,255,0.07);
+    }
+    #ask-input {
+      flex: 1; background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px; padding: 10px 14px;
+      font-size: 15px; color: #fff; font-family: inherit;
+      outline: none; resize: none; min-height: 42px; max-height: 120px;
+      line-height: 1.45; -webkit-user-select: text; user-select: text;
+      touch-action: auto; transition: border-color .2s;
+    }
+    #ask-input::placeholder { color: rgba(255,255,255,0.25); }
+    #ask-input:focus { border-color: rgba(155,93,229,0.6); }
+
+    #ask-send {
+      width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
+      background: linear-gradient(135deg, #6e40c9, #9b5de5);
+      border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: transform .15s cubic-bezier(.34,1.56,.64,1), opacity .2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #ask-send:hover { transform: scale(1.08); }
+    #ask-send:active { transform: scale(0.9); }
+    #ask-send:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    #ask-send svg { width: 18px; height: 18px; }
   </style>
 </head>
 <body>
@@ -206,7 +313,15 @@
         <span id="win-status" style="color:var(--muted);font-size:12px;">Select a window to stream</span>
       </div>
       <div id="win-list" style="display:flex;flex-direction:column;gap:5px;overflow-y:auto;max-height:150px;flex-shrink:0;"></div>
-      <canvas id="win-canvas" style="flex:1;width:100%;min-height:0;border:1px solid #333;border-radius:6px;background:#000;cursor:crosshair;"></canvas>
+      <div style="position:relative;flex:1;min-height:0;">
+        <canvas id="win-canvas" style="width:100%;height:100%;border:1px solid #333;border-radius:6px;background:#000;cursor:crosshair;display:block;"></canvas>
+        <!-- Ask Claude FAB -->
+        <button id="ask-fab" aria-label="Ask Claude about this screen">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L13.09 8.26L19 7L14.74 11.74L21 12L14.74 12.26L19 17L13.09 15.74L12 22L10.91 15.74L5 17L9.26 12.26L3 12L9.26 11.74L5 7L10.91 8.26L12 2Z" fill="white" opacity="0.9"/>
+          </svg>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -278,6 +393,32 @@
 
 <div id="toast"></div>
 
+<!-- Ask Claude Bottom Sheet -->
+<div id="ask-sheet-overlay"></div>
+<div id="ask-sheet" role="dialog" aria-modal="true" aria-label="Ask Claude">
+  <div id="ask-handle-row"><div id="ask-handle"></div></div>
+  <div id="ask-header">
+    <div id="ask-header-icon">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2L13.09 8.26L19 7L14.74 11.74L21 12L14.74 12.26L19 17L13.09 15.74L12 22L10.91 15.74L5 17L9.26 12.26L3 12L9.26 11.74L5 7L10.91 8.26L12 2Z" fill="white"/>
+      </svg>
+    </div>
+    <div>
+      <div id="ask-title">Ask Claude</div>
+      <div id="ask-subtitle">Vision · Streaming</div>
+    </div>
+  </div>
+  <div id="ask-response"></div>
+  <div id="ask-input-row">
+    <textarea id="ask-input" placeholder="What do you see? What should I do?" rows="1"></textarea>
+    <button id="ask-send" aria-label="Send">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
 <script type="module">
 import RFB from '/novnc/core/rfb.js';
 import { Terminal } from '/xterm/lib/xterm.mjs';
@@ -331,7 +472,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     if (pid === 'panel-term') fitTerminal();
     if (pid === 'panel-files' && filesList.length === 0) loadFiles(currentFilesPath);
     if (pid === 'panel-windows') loadWindows();
-    if (pid !== 'panel-windows' && winWs) { winWs.close(); winWs = null; winActive = false; }
+    if (pid !== 'panel-windows' && winWs) { winWs.close(); winWs = null; winActive = false; activeWinId = null; closeAskSheet(); }
   });
 });
 
@@ -754,6 +895,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').cat
 // ── Window stream & control ───────────────────────────────────────────────────
 let winWs     = null;
 let winActive = false; // currently streaming
+let activeWinId = null; // for Ask Claude
 
 async function loadWindows() {
   $('win-status').textContent = 'Loading...';
@@ -788,6 +930,8 @@ function startWindowStream(windowId) {
     winWs.send(JSON.stringify({ id: windowId }));
     $('win-status').textContent = 'Streaming...';
     winActive = true;
+    activeWinId = windowId;
+    $('ask-fab').classList.add('visible');
   };
 
   const canvas = $('win-canvas');
@@ -802,19 +946,25 @@ function startWindowStream(windowId) {
       return;
     }
     const blob = new Blob([e.data], { type: 'image/jpeg' });
-    const url  = URL.createObjectURL(blob);
-    const img  = new Image();
-    img.onload = () => {
-      canvas.width  = img.width;
-      canvas.height = img.height;
-      ctx.drawImage(img, 0, 0);
-      URL.revokeObjectURL(url);
-    };
-    img.src = url;
+    // createImageBitmap is faster than new Image() — no DOM overhead
+    createImageBitmap(blob).then((bmp) => {
+      if (canvas.width !== bmp.width)  canvas.width  = bmp.width;
+      if (canvas.height !== bmp.height) canvas.height = bmp.height;
+      ctx.drawImage(bmp, 0, 0);
+      bmp.close();
+    }).catch(() => {
+      // fallback for browsers without createImageBitmap
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => { canvas.width = img.width; canvas.height = img.height; ctx.drawImage(img, 0, 0); URL.revokeObjectURL(url); };
+      img.src = url;
+    });
   };
 
   winWs.onclose = () => {
     winActive = false;
+    activeWinId = null;
+    $('ask-fab').classList.remove('visible');
     if ($('win-status').textContent === 'Streaming...') $('win-status').textContent = 'Disconnected';
   };
   winWs.onerror = () => { $('win-status').textContent = 'Connection error'; };
@@ -861,6 +1011,181 @@ winCanvas.addEventListener('wheel', (e) => {
   const {x, y} = canvasCoords(e);
   sendWinCtrl({ type: 'scroll', x, y, delta: -e.deltaY / 100 });
 }, { passive: false });
+
+// Touch support — 1 finger = mouse drag, 2 fingers = scroll
+let lastPinchY = null;
+winCanvas.addEventListener('touchstart', (e) => {
+  if (!winActive) return;
+  e.preventDefault();
+  if (e.touches.length === 1) {
+    const {x, y} = canvasCoords(e.touches[0]);
+    sendWinCtrl({ type: 'mouse_down', x, y, button: 'left' });
+  } else if (e.touches.length === 2) {
+    lastPinchY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+  }
+}, { passive: false });
+winCanvas.addEventListener('touchmove', (e) => {
+  if (!winActive) return;
+  e.preventDefault();
+  if (e.touches.length === 1) {
+    const {x, y} = canvasCoords(e.touches[0]);
+    sendWinCtrl({ type: 'mouse_move', x, y });
+  } else if (e.touches.length === 2 && lastPinchY !== null) {
+    const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    const delta = (midY - lastPinchY) / 30;
+    if (Math.abs(delta) > 0.1) {
+      const {x, y} = canvasCoords({ clientX: midX, clientY: midY });
+      sendWinCtrl({ type: 'scroll', x, y, delta });
+    }
+    lastPinchY = midY;
+  }
+}, { passive: false });
+winCanvas.addEventListener('touchend', (e) => {
+  if (!winActive) return;
+  e.preventDefault();
+  lastPinchY = null;
+  if (e.changedTouches.length && e.touches.length === 0) {
+    const {x, y} = canvasCoords(e.changedTouches[0]);
+    sendWinCtrl({ type: 'mouse_up', x, y, button: 'left' });
+  }
+}, { passive: false });
+
+// ── Ask Claude bottom sheet ───────────────────────────────────────────────────
+const askFab      = $('ask-fab');
+const askSheet    = $('ask-sheet');
+const askOverlay  = $('ask-sheet-overlay');
+const askInput    = $('ask-input');
+const askSend     = $('ask-send');
+const askResponse = $('ask-response');
+let askEs         = null; // active EventSource
+let activeWinId   = null; // currently streamed window id
+
+function openAskSheet() {
+  askSheet.classList.add('open');
+  askOverlay.classList.add('open');
+  askInput.focus();
+  // Auto-expand textarea
+  askInput.style.height = 'auto';
+}
+function closeAskSheet() {
+  askSheet.classList.remove('open');
+  askOverlay.classList.remove('open');
+  cancelAsk();
+}
+
+// FAB — show when streaming, open sheet on click
+askFab.addEventListener('click', openAskSheet);
+askOverlay.addEventListener('click', closeAskSheet);
+
+// Swipe down on handle to dismiss
+let sheetDragStart = null;
+$('ask-handle').addEventListener('touchstart', (e) => { sheetDragStart = e.touches[0].clientY; }, { passive: true });
+$('ask-handle').addEventListener('touchmove', (e) => {
+  if (!sheetDragStart) return;
+  const delta = e.touches[0].clientY - sheetDragStart;
+  if (delta > 0) askSheet.style.transform = `translateY(${delta}px)`;
+}, { passive: true });
+$('ask-handle').addEventListener('touchend', (e) => {
+  const delta = e.changedTouches[0].clientY - (sheetDragStart || 0);
+  askSheet.style.transform = '';
+  if (delta > 80) closeAskSheet();
+  sheetDragStart = null;
+});
+
+// Auto-grow textarea
+askInput.addEventListener('input', () => {
+  askInput.style.height = 'auto';
+  askInput.style.height = Math.min(askInput.scrollHeight, 120) + 'px';
+});
+// Send on Enter (not Shift+Enter)
+askInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitAsk(); }
+});
+askSend.addEventListener('click', submitAsk);
+
+function cancelAsk() {
+  if (askEs) { askEs.close(); askEs = null; }
+  askSend.disabled = false;
+  // Remove streaming cursor if present
+  const cursor = askResponse.querySelector('.ask-cursor');
+  if (cursor) cursor.remove();
+}
+
+function submitAsk() {
+  const q = askInput.value.trim();
+  if (!q || askSend.disabled) return;
+
+  cancelAsk();
+  askResponse.innerHTML = '';
+  askSend.disabled = true;
+
+  // Append cursor for streaming indicator
+  const cursorEl = document.createElement('span');
+  cursorEl.className = 'ask-cursor';
+  askResponse.appendChild(cursorEl);
+
+  let buffer = '';
+  let textNode = document.createTextNode('');
+  askResponse.insertBefore(textNode, cursorEl);
+
+  // POST to SSE endpoint with optional windowId
+  const body = { question: q };
+  if (activeWinId !== null) body.windowId = activeWinId;
+
+  // Use fetch + ReadableStream for SSE over POST
+  fetch('/api/ask-claude', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(async (res) => {
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+      askResponse.textContent = `Error: ${err.error || res.statusText}`;
+      askSend.disabled = false;
+      return;
+    }
+    const reader = res.body.getReader();
+    const dec    = new TextDecoder();
+    let leftover = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      leftover += dec.decode(value, { stream: true });
+      const lines = leftover.split('\n');
+      leftover = lines.pop(); // last may be incomplete
+      for (const line of lines) {
+        if (line.startsWith('event: delta')) continue;
+        if (line.startsWith('data: ') && line.includes('"text"')) {
+          try {
+            const obj = JSON.parse(line.slice(6));
+            buffer += obj.text;
+            textNode.textContent = buffer;
+            askResponse.scrollTop = askResponse.scrollHeight;
+          } catch {}
+        }
+        if (line.startsWith('data: ') && (line.includes('"done"') || line.includes('"error"'))) {
+          try {
+            const obj = JSON.parse(line.slice(6));
+            if (obj.message) buffer += `\n\nError: ${obj.message}`;
+            textNode.textContent = buffer;
+          } catch {}
+          cursorEl.remove();
+          askSend.disabled = false;
+        }
+      }
+    }
+    cursorEl.remove();
+    askSend.disabled = false;
+  }).catch((e) => {
+    askResponse.textContent = `Network error: ${e.message}`;
+    cursorEl.remove();
+    askSend.disabled = false;
+  });
+
+  askInput.value = '';
+  askInput.style.height = 'auto';
+}
 
 // Keyboard: capture when canvas is focused (click to focus)
 winCanvas.setAttribute('tabindex', '0');

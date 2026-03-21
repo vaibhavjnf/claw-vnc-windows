@@ -887,7 +887,8 @@ function sendCtrl(cmd) {
 // ── /api/windows — list capturable windows ───────────────────────────────────
 app.get('/api/windows', (req, res) => {
   try {
-    const { Window } = require('node-screenshots');
+    winListAge = 0; // Force refresh on explicit list request
+    const { Window } = require('node-screenshots'); // eslint-disable-line no-unused-vars
     const windows = Window.all()
       .filter(w => w.title()?.trim() && !w.isMinimized())
       .map(w => ({
@@ -902,6 +903,99 @@ app.get('/api/windows', (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// ── /api/ask-claude — Claude Vision via Claude Code headless (no API key needed)
+app.post('/api/ask-claude', express.json(), async (req, res) => {
+  const { windowId, question } = req.body || {};
+  if (!question) return res.status(400).json({ error: 'question required' });
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const send = (ev, data) => res.write(`event: ${ev}\ndata: ${JSON.stringify(data)}\n\n`);
+
+  let tmpImg = null;
+  try {
+    // Capture screenshot to a temp file if a window is being streamed
+    if (windowId !== undefined) {
+      try {
+        const w = getCachedWindows().find(ww => ww.id() === windowId);
+        if (w) {
+          const jpeg = (await w.captureImage()).toJpegSync();
+          tmpImg = path.join(os.tmpdir(), `claw-ask-${Date.now()}.jpg`);
+          fs.writeFileSync(tmpImg, jpeg);
+        }
+      } catch (e) {
+        console.error('[ask-claude] screenshot error:', e.message);
+      }
+    }
+
+    // Build prompt — if we have a screenshot, tell codex to look at it
+    const prompt = tmpImg
+      ? `You are a helpful assistant. Look at the screenshot image at "${tmpImg}" and answer: ${question}`
+      : `You are a helpful assistant. Answer this question about the remote desktop session: ${question}`;
+
+    // Use codex exec as the AI engine — already authenticated, no extra API key needed
+    const child = spawn('codex', [
+      'exec',
+      '--dangerously-bypass-approvals-and-sandbox',
+      '-q',   // quiet: no spinner/status lines
+      prompt,
+    ], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+      env: { ...process.env },
+    });
+
+    child.stdout.on('data', (chunk) => {
+      // Stream text chunks as SSE delta events
+      const text = chunk.toString();
+      if (text.trim()) send('delta', { text });
+    });
+    child.stderr.on('data', (chunk) => {
+      console.error('[ask-claude] stderr:', chunk.toString().trim());
+    });
+    child.on('close', (code) => {
+      if (tmpImg) try { fs.unlinkSync(tmpImg); } catch {}
+      send('done', { code });
+      res.end();
+    });
+    child.on('error', (e) => {
+      console.error('[ask-claude] spawn error:', e.message);
+      if (tmpImg) try { fs.unlinkSync(tmpImg); } catch {}
+      send('error', { message: e.message });
+      res.end();
+    });
+
+    // Clean up on client disconnect
+    req.on('close', () => {
+      child.kill();
+      if (tmpImg) try { fs.unlinkSync(tmpImg); } catch {}
+    });
+
+  } catch (e) {
+    console.error('[ask-claude] error:', e.message);
+    if (tmpImg) try { fs.unlinkSync(tmpImg); } catch {}
+    send('error', { message: e.message });
+    res.end();
+  }
+});
+
+// ── Window.all() cache — refresh every 3s instead of every capture frame ──────
+let winListCache = [];
+let winListAge   = 0;
+function getCachedWindows() {
+  if (Date.now() - winListAge > 3000) {
+    try {
+      const { Window } = require('node-screenshots');
+      winListCache = Window.all();
+      winListAge   = Date.now();
+    } catch {}
+  }
+  return winListCache;
+}
 
 // ── /window-stream WebSocket — stream & control a specific window ─────────────
 const windowStreamWss = new WebSocket.Server({ noServer: true });
@@ -925,10 +1019,9 @@ windowStreamWss.on('connection', (ws) => {
       if (IS_WIN) sendCtrl(`FOCUS|${targetId}`);
 
       ;(async () => {
-        const { Window } = require('node-screenshots');
         while (streaming && ws.readyState === 1) {
           try {
-            const w = Window.all().find(ww => ww.id() === targetId);
+            const w = getCachedWindows().find(ww => ww.id() === targetId);
             if (!w) { ws.send(JSON.stringify({ error: 'window_not_found' })); break; }
             winPos = { x: w.x(), y: w.y(), width: w.width(), height: w.height() };
             const image = await w.captureImage();
