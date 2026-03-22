@@ -321,8 +321,9 @@ function parseCookies(str) {
 }
 
 function checkAuth(req, res, next) {
-  // Allow login page and health check
-  if (req.path === '/login' || req.path === '/health') return next();
+  // Allow login page, health check, and PWA assets (manifest, icons, sw)
+  const publicPaths = ['/login', '/health', '/manifest.json', '/sw.js', '/icon-192.png', '/icon-512.png'];
+  if (publicPaths.includes(req.path)) return next();
   // Check query param — also set cookie so WebSocket upgrades inherit auth
   if (req.query.token === AUTH_TOKEN) {
     res.setHeader('Set-Cookie', `claw_token=${AUTH_TOKEN}; HttpOnly; SameSite=Strict; Secure; Path=/; Max-Age=86400`);
@@ -937,43 +938,31 @@ app.post('/api/ask-claude', express.json(), async (req, res) => {
       ? `You are a helpful assistant. Look at the screenshot image at "${tmpImg}" and answer: ${question}`
       : `You are a helpful assistant. Answer this question about the remote desktop session: ${question}`;
 
-    // Use codex exec as the AI engine — already authenticated, no extra API key needed
-    const child = spawn('codex', [
-      'exec',
-      '--dangerously-bypass-approvals-and-sandbox',
-      '-q',   // quiet: no spinner/status lines
-      prompt,
-    ], {
-      stdio: ['ignore', 'pipe', 'pipe'],
+    // Use claude --print as the AI engine (shell:true resolves claude.cmd on Windows)
+    const child = spawn('claude', ['--print'], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      shell: true,
       windowsHide: true,
-      env: { ...process.env },
+      env: process.env,
     });
+    child.stdin.write(prompt);
+    child.stdin.end();
 
+    let responseSent = false;
     child.stdout.on('data', (chunk) => {
-      // Stream text chunks as SSE delta events
       const text = chunk.toString();
       if (text.trim()) send('delta', { text });
     });
-    child.stderr.on('data', (chunk) => {
-      console.error('[ask-claude] stderr:', chunk.toString().trim());
-    });
-    child.on('close', (code) => {
+    const cleanup = () => {
       if (tmpImg) try { fs.unlinkSync(tmpImg); } catch {}
-      send('done', { code });
-      res.end();
+    };
+    child.on('close', (code) => {
+      responseSent = true; cleanup(); send('done', { code }); res.end();
     });
     child.on('error', (e) => {
-      console.error('[ask-claude] spawn error:', e.message);
-      if (tmpImg) try { fs.unlinkSync(tmpImg); } catch {}
-      send('error', { message: e.message });
-      res.end();
+      responseSent = true; cleanup(); send('error', { message: e.message }); res.end();
     });
-
-    // Clean up on client disconnect
-    req.on('close', () => {
-      child.kill();
-      if (tmpImg) try { fs.unlinkSync(tmpImg); } catch {}
-    });
+    res.on('close', () => { if (!responseSent) { child.kill(); cleanup(); } });
 
   } catch (e) {
     console.error('[ask-claude] error:', e.message);

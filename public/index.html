@@ -6,275 +6,635 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="theme-color" content="#0d0d0f">
+  <meta name="theme-color" content="#000000">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <link rel="stylesheet" href="/xterm/css/xterm.css">
   <title>claw</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Apple Intelligence Design System ── */
     :root {
-      --bg: #0d0d0f; --surface: #161618; --border: #2a2a2e;
-      --text: #d0d0d8; --muted: #555560; --green: #00e676;
-      --red: #ff5252; --blue: #448aff;
-      --sai-top: env(safe-area-inset-top, 0px);
+      /* iOS Dark backgrounds */
+      --bg:          #000000;
+      --bg1:         #1C1C1E;
+      --bg2:         #2C2C2E;
+      --bg3:         #3A3A3C;
+      /* Labels */
+      --label:       #FFFFFF;
+      --label2:      rgba(235,235,245,0.6);
+      --label3:      rgba(235,235,245,0.3);
+      --label4:      rgba(235,235,245,0.18);
+      /* iOS system colors */
+      --blue:        #0A84FF;
+      --green:       #30D158;
+      --red:         #FF453A;
+      --orange:      #FF9F0A;
+      --teal:        #64D2FF;
+      --purple:      #BF5AF2;
+      --pink:        #FF375F;
+      /* Glass */
+      --glass:       rgba(28,28,30,0.88);
+      --glass-hi:    rgba(44,44,46,0.72);
+      --glass-line:  rgba(255,255,255,0.1);
+      --glass-line2: rgba(255,255,255,0.06);
+      /* Separator */
+      --sep:         rgba(84,84,88,0.55);
+      /* AI aurora */
+      --ai1: #0A84FF; --ai2: #BF5AF2; --ai3: #FF375F; --ai4: #FF9F0A;
+      /* Safe area */
+      --sai-top:    env(safe-area-inset-top,    0px);
       --sai-bottom: env(safe-area-inset-bottom, 0px);
-      --sai-left: env(safe-area-inset-left, 0px);
-      --sai-right: env(safe-area-inset-right, 0px);
+      --sai-left:   env(safe-area-inset-left,   0px);
+      --sai-right:  env(safe-area-inset-right,  0px);
+      /* Spring */
+      --spring: cubic-bezier(.34,1.56,.64,1);
+      --ease-out: cubic-bezier(.25,.46,.45,.94);
     }
+
     html, body {
-      height: 100%; background: var(--bg); color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Mono', 'Fira Code', monospace;
-      overflow: hidden; overscroll-behavior: none;
-      -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+      height: 100%;
+      background: var(--bg);
+      color: var(--label);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+      overscroll-behavior: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
       touch-action: none;
     }
-    #app { display: flex; flex-direction: column; height: 100dvh; height: -webkit-fill-available; padding-top: var(--sai-top); }
 
-    /* ── Tabs ── */
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      height: -webkit-fill-available;
+      padding-top: var(--sai-top);
+    }
+
+    /* ── Tab bar ── */
     #tabs {
-      display: flex; background: var(--surface); border-bottom: 1px solid var(--border);
-      flex-shrink: 0; overflow-x: auto; scrollbar-width: none;
-      padding-left: var(--sai-left); padding-right: var(--sai-right);
+      display: flex;
+      background: var(--glass);
+      border-bottom: 0.5px solid var(--glass-line);
+      flex-shrink: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding-left: max(12px, var(--sai-left));
+      padding-right: max(12px, var(--sai-right));
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
     }
     #tabs::-webkit-scrollbar { display: none; }
     .tab {
-      padding: 8px 16px; font-size: 13px; color: var(--muted); cursor: pointer;
-      border-bottom: 2px solid transparent; white-space: nowrap; flex-shrink: 0;
-      -webkit-tap-highlight-color: transparent; transition: color .15s;
+      padding: 9px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: -0.1px;
+      color: var(--label3);
+      cursor: pointer;
+      border-bottom: 1.5px solid transparent;
+      white-space: nowrap;
+      flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+      transition: color .18s var(--ease-out), border-color .18s;
     }
-    .tab:hover { color: var(--text); }
-    .tab.active { color: var(--green); border-bottom-color: var(--green); }
+    .tab:hover { color: var(--label2); }
+    .tab.active { color: var(--blue); border-bottom-color: var(--blue); }
 
     /* ── Panels ── */
     .panel { flex: 1; display: none; overflow: hidden; position: relative; }
     .panel.active { display: flex; flex-direction: column; }
 
-    /* VNC */
-    #vnc-wrap { flex: 1; background: #000; overflow: hidden; touch-action: none; position: relative; }
-    #vnc-wrap canvas { display: block; touch-action: none; }
-
-    /* Monitor selector */
-    .mon-sel { display: flex; gap: 2px; }
-    .mon-btn {
-      background: transparent; border: 1px solid var(--border); color: var(--muted);
-      padding: 4px 8px; font-size: 11px; cursor: pointer; font-family: inherit;
-      transition: all .15s; -webkit-tap-highlight-color: transparent;
+    /* ── VNC ── */
+    #vnc-wrap {
+      flex: 1;
+      background: #000;
+      overflow: hidden;
+      touch-action: none;
+      position: relative;
+      contain: strict;
     }
-    .mon-btn:first-child { border-radius: 4px 0 0 4px; }
-    .mon-btn:last-child { border-radius: 0 4px 4px 0; }
-    .mon-btn.active { color: var(--green); border-color: var(--green); background: rgba(0,230,118,.08); }
-    .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: rgba(0,0,0,0.82); z-index: 50; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+    #vnc-wrap canvas {
+      display: block;
+      touch-action: none;
+      transition: transform .3s var(--ease-out);
+    }
+
+    /* ── Monitor selector — iOS segmented control ── */
+    .mon-sel {
+      display: flex;
+      background: rgba(118,118,128,0.24);
+      border-radius: 9px;
+      padding: 2px;
+      gap: 0;
+    }
+    .mon-btn {
+      background: transparent;
+      border: none;
+      color: var(--label2);
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      border-radius: 7px;
+      transition: background .18s var(--ease-out), color .18s, box-shadow .18s;
+      -webkit-tap-highlight-color: transparent;
+      white-space: nowrap;
+    }
+    .mon-btn.active {
+      background: var(--bg2);
+      color: var(--label);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 0.5px 0.5px rgba(0,0,0,0.2);
+    }
+
+    /* ── VNC overlay ── */
+    .overlay {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 16px;
+      background: rgba(0,0,0,0.75);
+      z-index: 50;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
     .overlay.hidden { display: none; }
-    .overlay-title { font-size: 15px; color: var(--muted); }
-    .spinner { width: 28px; height: 28px; border: 2px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    .overlay-title { font-size: 14px; font-weight: 400; color: var(--label2); }
+
+    /* iOS-style activity indicator */
+    .spinner {
+      width: 24px; height: 24px;
+      position: relative;
+    }
+    .spinner::after {
+      content: '';
+      position: absolute; inset: 0;
+      border: 2px solid transparent;
+      border-top-color: var(--label2);
+      border-right-color: var(--label2);
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Terminal */
+    /* ── Terminal ── */
     #term-container { flex: 1; padding: 4px; background: #000; overflow: hidden; }
     #term-container .xterm { height: 100%; }
 
-    /* Files */
-    #files-panel { padding: 10px; overflow-y: auto; -webkit-overflow-scrolling: touch; flex: 1; touch-action: pan-y; }
-    #files-path { display: flex; align-items: center; gap: 6px; padding: 6px 0; flex-wrap: wrap; }
+    /* ── Files ── */
+    #files-panel {
+      padding: 10px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      flex: 1;
+      touch-action: pan-y;
+    }
+    #files-path {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 0; flex-wrap: wrap;
+    }
     #files-path-text { font-size: 12px; color: var(--blue); word-break: break-all; flex: 1; }
     #files-list { list-style: none; }
     #files-list li {
-      display: flex; align-items: center; gap: 8px; padding: 10px 8px;
-      border-bottom: 1px solid var(--border); cursor: pointer;
-      -webkit-tap-highlight-color: transparent; font-size: 14px;
+      display: flex; align-items: center; gap: 10px;
+      padding: 11px 12px;
+      border-bottom: 0.5px solid var(--sep);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      font-size: 14px; font-weight: 400;
+      border-radius: 10px;
+      transition: background .12s;
     }
-    #files-list li:active { background: rgba(255,255,255,0.04); }
-    .f-icon { font-size: 16px; flex-shrink: 0; width: 20px; text-align: center; }
+    #files-list li:active { background: var(--bg2); }
+    .f-icon { font-size: 16px; flex-shrink: 0; width: 22px; text-align: center; }
     .f-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .f-actions { display: flex; gap: 4px; }
-    .f-btn { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer; font-family: inherit; }
-    .f-btn:hover { color: var(--text); border-color: #555; }
-
-    /* Upload area */
-    #upload-area {
-      border: 2px dashed var(--border); border-radius: 8px; padding: 16px;
-      text-align: center; color: var(--muted); font-size: 12px; margin-top: 10px;
-      cursor: pointer; transition: border-color .2s;
+    .f-btn {
+      background: var(--bg2); border: none; color: var(--blue);
+      border-radius: 6px; padding: 4px 10px; font-size: 12px; font-weight: 500;
+      cursor: pointer; font-family: inherit;
     }
-    #upload-area:hover, #upload-area.drag { border-color: var(--green); color: var(--text); }
+    #upload-area {
+      border: 1.5px dashed var(--bg3); border-radius: 12px; padding: 18px;
+      text-align: center; color: var(--label3); font-size: 13px; margin-top: 12px;
+      cursor: pointer; transition: border-color .2s, color .2s;
+    }
+    #upload-area:hover, #upload-area.drag { border-color: var(--blue); color: var(--label2); }
 
-    /* ── Bottom bar ── */
+    /* ── Windows panel ── */
+    #panel-windows-inner {
+      display: flex; flex-direction: column; gap: 10px;
+      padding: 12px; height: 100%; box-sizing: border-box;
+    }
+    #win-header { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+    #win-status { color: var(--label3); font-size: 12px; font-weight: 400; }
+    #win-list {
+      display: flex; flex-direction: column; gap: 4px;
+      overflow-y: auto; max-height: 140px; flex-shrink: 0;
+    }
+    #win-canvas-wrap { position: relative; flex: 1; min-height: 0; }
+    #win-canvas {
+      width: 100%; height: 100%;
+      border-radius: 12px;
+      background: #000;
+      cursor: crosshair;
+      display: block;
+      border: 0.5px solid var(--glass-line);
+    }
+
+    /* ── Bottom toolbar ── */
     #bar {
-      display: flex; align-items: center; gap: 4px; padding: 5px 8px;
-      padding-bottom: max(5px, var(--sai-bottom));
-      padding-left: max(8px, var(--sai-left)); padding-right: max(8px, var(--sai-right));
-      background: var(--surface); border-top: 1px solid var(--border);
-      flex-shrink: 0; overflow-x: auto; overflow-y: hidden;
-      -webkit-overflow-scrolling: touch; scrollbar-width: none;
+      display: flex; align-items: center; gap: 3px;
+      padding: 6px 10px;
+      padding-bottom: max(6px, var(--sai-bottom));
+      padding-left: max(10px, var(--sai-left));
+      padding-right: max(10px, var(--sai-right));
+      background: var(--glass);
+      border-top: 0.5px solid var(--glass-line);
+      flex-shrink: 0;
+      overflow-x: auto; overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
     }
     #bar::-webkit-scrollbar { display: none; }
+
+    /* Status pill */
+    #status-pill {
+      display: flex; align-items: center; gap: 5px;
+      background: var(--bg2); border-radius: 20px;
+      padding: 4px 8px 4px 6px;
+      flex-shrink: 0;
+    }
+    #dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--label3); flex-shrink: 0;
+      transition: background .3s;
+    }
+    #dot.ok { background: var(--green); }
+    #dot.err { background: var(--red); box-shadow: 0 0 6px rgba(255,69,58,.5); }
+    #status-text { font-size: 11px; font-weight: 500; color: var(--label2); }
+
+    /* Glass buttons */
     .btn {
-      background: transparent; border: 1px solid var(--border); color: var(--muted);
-      padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px;
-      font-family: inherit; white-space: nowrap; flex-shrink: 0;
-      transition: color .12s, border-color .12s, background .12s;
+      background: var(--glass-hi);
+      border: 0.5px solid var(--glass-line);
+      color: var(--label2);
+      padding: 6px 11px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px; font-weight: 500;
+      font-family: inherit;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background .14s, color .14s, transform .12s var(--spring);
       -webkit-tap-highlight-color: transparent;
     }
-    .btn:hover { color: var(--text); border-color: #555; }
-    .btn.on { color: var(--green); border-color: var(--green); background: rgba(0,230,118,.08); }
-    #dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex-shrink: 0; transition: background .3s; }
-    #dot.ok { background: var(--green); }
-    #dot.err { background: var(--red); }
-    #status-text { font-size: 11px; color: var(--muted); white-space: nowrap; }
-    .sep { width: 1px; height: 22px; background: var(--border); margin: 0 2px; flex-shrink: 0; }
+    .btn:active { transform: scale(0.93); }
+    .btn:hover { background: var(--bg2); color: var(--label); }
+    .btn.on {
+      background: rgba(10,132,255,0.2);
+      border-color: rgba(10,132,255,0.4);
+      color: var(--blue);
+    }
+
+    .sep { width: 0.5px; height: 20px; background: var(--sep); margin: 0 1px; flex-shrink: 0; }
     .spacer { flex: 1; min-width: 4px; }
 
     /* ── D-pad ── */
-    #dpad-wrap { position: fixed; bottom: calc(54px + var(--sai-bottom)); right: calc(12px + var(--sai-right)); display: none; flex-direction: column; align-items: center; gap: 4px; z-index: 100; }
+    #dpad-wrap {
+      position: fixed;
+      bottom: calc(54px + var(--sai-bottom));
+      right: calc(12px + var(--sai-right));
+      display: none; flex-direction: column; align-items: center; gap: 4px;
+      z-index: 100;
+    }
     #dpad-wrap.show { display: flex; }
     .drow { display: flex; gap: 4px; }
-    .dp { width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; background: rgba(18,18,22,0.88); border: 1px solid rgba(255,255,255,.14); border-radius: 10px; color: #bbb; font-size: 19px; cursor: pointer; touch-action: none; -webkit-tap-highlight-color: transparent; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+    .dp {
+      width: 52px; height: 52px;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(44,44,46,0.85);
+      border: 0.5px solid rgba(255,255,255,.12);
+      border-radius: 12px;
+      color: var(--label2);
+      font-size: 17px;
+      cursor: pointer;
+      touch-action: none;
+      -webkit-tap-highlight-color: transparent;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      transition: background .1s, color .1s;
+    }
     .dp.ghost { visibility: hidden; }
-    .dp.mid { font-size: 10px; color: var(--muted); }
-    .dp:active, .dp.held { background: rgba(0,230,118,.18); color: var(--green); border-color: var(--green); }
+    .dp.mid { font-size: 9px; color: var(--label3); letter-spacing: 0.2px; }
+    .dp:active, .dp.held {
+      background: rgba(10,132,255,.22);
+      color: var(--blue);
+      border-color: rgba(10,132,255,.4);
+    }
     #speed-row { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
-    #speed-row label { font-size: 10px; color: var(--muted); }
-    #speed-slider { width: 80px; accent-color: var(--green); }
+    #speed-row label { font-size: 10px; color: var(--label3); }
+    #speed-slider { width: 80px; accent-color: var(--blue); }
 
     /* ── Keyboard panel ── */
-    #kbd-panel { position: fixed; bottom: calc(50px + var(--sai-bottom)); left: 50%; transform: translateX(-50%); background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; display: none; flex-direction: column; gap: 9px; width: min(96vw, 460px); z-index: 100; box-shadow: 0 6px 32px rgba(0,0,0,.7); }
+    #kbd-panel {
+      position: fixed;
+      bottom: calc(50px + var(--sai-bottom));
+      left: 50%; transform: translateX(-50%);
+      background: var(--glass);
+      border: 0.5px solid var(--glass-line);
+      border-radius: 16px;
+      padding: 14px 14px;
+      display: none; flex-direction: column; gap: 10px;
+      width: min(96vw, 460px);
+      z-index: 100;
+      box-shadow: 0 8px 40px rgba(0,0,0,.65), 0 2px 8px rgba(0,0,0,.3);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+    }
     #kbd-panel.show { display: flex; }
-    #kbd-input { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: 8px; font-size: 16px; font-family: inherit; width: 100%; outline: none; -webkit-user-select: text; user-select: text; touch-action: auto; }
-    #kbd-input:focus { border-color: var(--blue); }
+    #kbd-input {
+      background: var(--bg2); border: 0.5px solid var(--glass-line);
+      color: var(--label); padding: 10px 13px; border-radius: 10px;
+      font-size: 16px; font-family: inherit; width: 100%; outline: none;
+      -webkit-user-select: text; user-select: text; touch-action: auto;
+      transition: border-color .2s;
+    }
+    #kbd-input:focus { border-color: rgba(10,132,255,.6); }
     .key-grid { display: flex; flex-wrap: wrap; gap: 5px; }
-    .k { background: var(--bg); border: 1px solid var(--border); color: #aaa; padding: 6px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; font-family: inherit; white-space: nowrap; -webkit-tap-highlight-color: transparent; }
-    .k:active { background: #222; color: var(--text); }
+    .k {
+      background: var(--bg2); border: 0.5px solid var(--glass-line);
+      color: var(--label2); padding: 7px 10px; border-radius: 8px;
+      font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit;
+      white-space: nowrap; -webkit-tap-highlight-color: transparent;
+      transition: background .1s;
+    }
+    .k:active { background: var(--bg3); color: var(--label); }
 
     /* ── Clipboard modal ── */
-    #clip-modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.7); z-index: 200; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+    #clip-modal {
+      position: fixed; inset: 0;
+      display: none; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.6);
+      z-index: 200;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+    }
     #clip-modal.show { display: flex; }
-    #clip-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; width: min(92vw, 440px); display: flex; flex-direction: column; gap: 10px; }
-    #clip-box h3 { font-size: 14px; color: var(--text); font-weight: 500; }
-    #clip-textarea { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 10px; border-radius: 8px; font-size: 14px; font-family: inherit; width: 100%; height: 120px; resize: vertical; outline: none; -webkit-user-select: text; user-select: text; touch-action: auto; }
-    #clip-textarea:focus { border-color: var(--blue); }
+    #clip-box {
+      background: var(--glass);
+      border: 0.5px solid var(--glass-line);
+      border-radius: 16px; padding: 18px;
+      width: min(92vw, 440px);
+      display: flex; flex-direction: column; gap: 12px;
+      box-shadow: 0 8px 40px rgba(0,0,0,.5);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+    }
+    #clip-box h3 { font-size: 15px; font-weight: 600; color: var(--label); letter-spacing: -0.3px; }
+    #clip-textarea {
+      background: var(--bg2); border: 0.5px solid var(--glass-line);
+      color: var(--label); padding: 11px 12px; border-radius: 10px;
+      font-size: 14px; font-family: inherit; width: 100%; height: 120px;
+      resize: vertical; outline: none;
+      -webkit-user-select: text; user-select: text; touch-action: auto;
+      transition: border-color .2s;
+    }
+    #clip-textarea:focus { border-color: rgba(10,132,255,.5); }
     #clip-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
-    /* ── Toast ── */
-    #toast { position: fixed; top: calc(16px + var(--sai-top)); left: 50%; transform: translateX(-50%) translateY(-120%); background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 8px 16px; border-radius: 8px; font-size: 12px; z-index: 300; transition: transform .3s ease; pointer-events: none; }
+    /* ── Toast — iOS notification banner ── */
+    #toast {
+      position: fixed;
+      top: calc(14px + var(--sai-top));
+      left: 50%;
+      transform: translateX(-50%) translateY(calc(-100% - 20px));
+      background: var(--glass);
+      border: 0.5px solid var(--glass-line);
+      color: var(--label2);
+      padding: 9px 18px;
+      border-radius: 24px;
+      font-size: 13px; font-weight: 500;
+      z-index: 300;
+      transition: transform .35s var(--spring);
+      pointer-events: none;
+      white-space: nowrap;
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: 0 4px 20px rgba(0,0,0,.4);
+    }
     #toast.show { transform: translateX(-50%) translateY(0); }
 
-    /* ── Ask Claude FAB ── */
+    /* ─────────────────────────────────────────────────────────
+       Apple Intelligence — Ask Claude
+    ───────────────────────────────────────────────────────── */
+
+    /* Aurora keyframes */
+    @keyframes aurora-spin {
+      0%   { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes aurora-pulse {
+      0%, 100% { opacity: 0.7; transform: scale(1); }
+      50%       { opacity: 1;   transform: scale(1.08); }
+    }
+    @keyframes fab-enter {
+      from { transform: scale(0) rotate(-30deg); opacity: 0; }
+      to   { transform: scale(1) rotate(0deg);   opacity: 1; }
+    }
+    @keyframes blink {
+      0%,100% { opacity: 1; }
+      50%     { opacity: 0; }
+    }
+
+    /* FAB — the Apple Intelligence orb */
     #ask-fab {
-      position: absolute; bottom: 16px; right: 16px;
-      width: 48px; height: 48px; border-radius: 50%;
-      background: linear-gradient(135deg, #6e40c9 0%, #9b5de5 50%, #c77dff 100%);
+      position: absolute; bottom: 14px; right: 14px;
+      width: 50px; height: 50px; border-radius: 50%;
       border: none; cursor: pointer; z-index: 90;
       display: none; align-items: center; justify-content: center;
-      box-shadow: 0 4px 20px rgba(110,64,201,0.5), 0 0 0 0 rgba(155,93,229,0.4);
-      transition: transform .2s cubic-bezier(.34,1.56,.64,1), box-shadow .2s;
       -webkit-tap-highlight-color: transparent;
+      transition: transform .2s var(--spring);
     }
-    #ask-fab.visible { display: flex; }
-    #ask-fab:hover { transform: scale(1.1); box-shadow: 0 6px 28px rgba(110,64,201,0.7), 0 0 0 6px rgba(155,93,229,0.15); }
-    #ask-fab:active { transform: scale(0.94); }
-    #ask-fab svg { width: 22px; height: 22px; }
+    #ask-fab.visible {
+      display: flex;
+      animation: fab-enter .45s var(--spring) both;
+    }
+    #ask-fab:hover { transform: scale(1.08); }
+    #ask-fab:active { transform: scale(0.91); }
 
-    /* ── Ask Claude Bottom Sheet ── */
+    /* Aurora ring behind FAB */
+    #ask-fab::before {
+      content: '';
+      position: absolute; inset: -3px;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg,
+        var(--ai1), var(--ai2), var(--ai3), var(--ai4), var(--ai1));
+      animation: aurora-spin 3s linear infinite;
+      z-index: -1;
+    }
+    #ask-fab::after {
+      content: '';
+      position: absolute; inset: 1px;
+      border-radius: 50%;
+      background: var(--bg1);
+      z-index: -1;
+    }
+    /* FAB inner gradient disk */
+    #ask-fab-inner {
+      width: 100%; height: 100%;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, #0A84FF 0%, #BF5AF2 50%, #FF375F 100%);
+      animation: aurora-pulse 2.5s ease-in-out infinite;
+    }
+    #ask-fab svg { width: 20px; height: 20px; flex-shrink: 0; position: relative; z-index: 1; }
+
+    /* Sheet overlay */
     #ask-sheet-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-      z-index: 400; opacity: 0; pointer-events: none;
-      transition: opacity .3s ease;
-      backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 400;
+      opacity: 0; pointer-events: none;
+      transition: opacity .28s var(--ease-out);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
     }
     #ask-sheet-overlay.open { opacity: 1; pointer-events: all; }
 
+    /* Bottom sheet */
     #ask-sheet {
       position: fixed; left: 0; right: 0; bottom: 0;
-      background: rgba(22,22,26,0.96);
-      border-top: 1px solid rgba(255,255,255,0.08);
-      border-radius: 20px 20px 0 0;
-      padding: 0 0 max(24px, var(--sai-bottom)) 0;
+      background: rgba(20,20,22,0.94);
+      border-top: 0.5px solid var(--glass-line);
+      border-radius: 22px 22px 0 0;
+      padding: 0 0 max(20px, var(--sai-bottom)) 0;
       z-index: 401;
       transform: translateY(100%);
-      transition: transform .4s cubic-bezier(.32,0.72,0,1);
-      box-shadow: 0 -8px 48px rgba(0,0,0,0.6);
-      max-height: 80dvh; display: flex; flex-direction: column;
+      transition: transform .42s cubic-bezier(.32,.72,0,1);
+      box-shadow: 0 -2px 0 rgba(255,255,255,.05), 0 -12px 60px rgba(0,0,0,.65);
+      max-height: 82dvh;
+      display: flex; flex-direction: column;
+      backdrop-filter: blur(24px) saturate(200%);
+      -webkit-backdrop-filter: blur(24px) saturate(200%);
     }
     #ask-sheet.open { transform: translateY(0); }
 
+    /* AI aurora border animation on sheet (when streaming) */
+    #ask-sheet.streaming::before {
+      content: '';
+      position: absolute; top: -1px; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, var(--ai1), var(--ai2), var(--ai3), var(--ai4), var(--ai1));
+      background-size: 200% 100%;
+      animation: aurora-slide 2s linear infinite;
+      border-radius: 22px 22px 0 0;
+    }
+    @keyframes aurora-slide {
+      0%   { background-position: 0% 0%; }
+      100% { background-position: 200% 0%; }
+    }
+
+    /* Handle */
     #ask-handle-row {
       display: flex; align-items: center; justify-content: center;
-      padding: 12px 0 4px; flex-shrink: 0;
+      padding: 10px 0 2px; flex-shrink: 0;
     }
     #ask-handle {
       width: 36px; height: 4px; border-radius: 2px;
-      background: rgba(255,255,255,0.2); cursor: grab;
+      background: rgba(255,255,255,.18); cursor: grab;
     }
 
+    /* Header */
     #ask-header {
-      display: flex; align-items: center; gap: 10px;
+      display: flex; align-items: center; gap: 11px;
       padding: 8px 20px 12px; flex-shrink: 0;
     }
     #ask-header-icon {
-      width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
-      background: linear-gradient(135deg, #6e40c9, #c77dff);
+      width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+      background: linear-gradient(135deg, #0A84FF, #BF5AF2);
       display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 2px 12px rgba(10,132,255,.3);
     }
     #ask-header-icon svg { width: 18px; height: 18px; }
-    #ask-title { font-size: 15px; font-weight: 600; color: #fff; letter-spacing: -0.3px; }
-    #ask-subtitle { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 1px; }
+    #ask-title { font-size: 16px; font-weight: 600; color: var(--label); letter-spacing: -0.35px; }
+    #ask-subtitle { font-size: 12px; font-weight: 400; color: var(--label3); margin-top: 1px; }
 
+    /* Response area */
     #ask-response {
-      flex: 1; overflow-y: auto; padding: 0 20px 12px;
-      font-size: 14px; line-height: 1.65; color: rgba(255,255,255,0.85);
+      flex: 1; overflow-y: auto; padding: 0 20px 14px;
+      font-size: 15px; font-weight: 400;
+      line-height: 1.6; color: rgba(235,235,245,.88);
       -webkit-overflow-scrolling: touch; touch-action: pan-y;
-      min-height: 60px; max-height: 40dvh;
+      min-height: 56px; max-height: 38dvh;
     }
-    #ask-response:empty::before { content: 'Ask anything about what you see on screen…'; color: rgba(255,255,255,0.25); font-style: italic; }
-    #ask-response p { margin: 0 0 10px; }
-    #ask-response p:last-child { margin-bottom: 0; }
+    #ask-response:empty::before {
+      content: 'Ask anything about what you see on screen…';
+      color: var(--label3);
+      font-style: italic;
+    }
 
+    /* Streaming cursor */
     .ask-cursor {
-      display: inline-block; width: 2px; height: 1em;
-      background: #9b5de5; vertical-align: text-bottom;
-      animation: blink .7s step-end infinite; margin-left: 1px;
+      display: inline-block; width: 2px; height: 1.1em;
+      background: linear-gradient(to bottom, var(--ai1), var(--ai2));
+      vertical-align: text-bottom; margin-left: 1px;
+      animation: blink .8s step-end infinite;
+      border-radius: 1px;
     }
-    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
 
+    /* Input row */
     #ask-input-row {
       display: flex; gap: 10px; align-items: flex-end;
       padding: 10px 16px 0; flex-shrink: 0;
-      border-top: 1px solid rgba(255,255,255,0.07);
+      border-top: 0.5px solid var(--glass-line2);
     }
     #ask-input {
-      flex: 1; background: rgba(255,255,255,0.07);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 12px; padding: 10px 14px;
-      font-size: 15px; color: #fff; font-family: inherit;
-      outline: none; resize: none; min-height: 42px; max-height: 120px;
-      line-height: 1.45; -webkit-user-select: text; user-select: text;
-      touch-action: auto; transition: border-color .2s;
+      flex: 1;
+      background: rgba(255,255,255,.07);
+      border: 0.5px solid rgba(255,255,255,.1);
+      border-radius: 13px; padding: 10px 14px;
+      font-size: 15px; color: var(--label); font-family: inherit;
+      outline: none; resize: none;
+      min-height: 44px; max-height: 120px;
+      line-height: 1.45;
+      -webkit-user-select: text; user-select: text;
+      touch-action: auto;
+      transition: border-color .2s;
     }
-    #ask-input::placeholder { color: rgba(255,255,255,0.25); }
-    #ask-input:focus { border-color: rgba(155,93,229,0.6); }
+    #ask-input::placeholder { color: var(--label3); }
+    #ask-input:focus { border-color: rgba(10,132,255,.5); }
 
     #ask-send {
-      width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
-      background: linear-gradient(135deg, #6e40c9, #9b5de5);
-      border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
-      transition: transform .15s cubic-bezier(.34,1.56,.64,1), opacity .2s;
+      width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+      background: linear-gradient(135deg, #0A84FF, #BF5AF2);
+      border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform .18s var(--spring), opacity .2s;
       -webkit-tap-highlight-color: transparent;
+      box-shadow: 0 2px 12px rgba(10,132,255,.35);
     }
-    #ask-send:hover { transform: scale(1.08); }
-    #ask-send:active { transform: scale(0.9); }
-    #ask-send:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    #ask-send:hover { transform: scale(1.07); }
+    #ask-send:active { transform: scale(0.88); }
+    #ask-send:disabled { opacity: 0.35; cursor: not-allowed; transform: none; box-shadow: none; }
     #ask-send svg { width: 18px; height: 18px; }
   </style>
 </head>
 <body>
 <div id="app">
-  <!-- Tabs -->
+
+  <!-- Tab bar -->
   <div id="tabs">
     <div class="tab active" data-panel="panel-vnc">Desktop</div>
     <div class="tab" data-panel="panel-term">Terminal</div>
     <div class="tab" data-panel="panel-files">Files</div>
-    <div class="tab" data-panel="panel-windows">Win</div>
+    <div class="tab" data-panel="panel-windows">Windows</div>
   </div>
 
   <!-- VNC Panel -->
@@ -282,7 +642,7 @@
     <div id="vnc-wrap">
       <div class="overlay hidden" id="ov-conn">
         <div class="spinner"></div>
-        <div class="overlay-title" id="conn-msg">Connecting...</div>
+        <div class="overlay-title" id="conn-msg">Connecting…</div>
       </div>
     </div>
   </div>
@@ -296,7 +656,7 @@
   <div class="panel" id="panel-files">
     <div id="files-panel">
       <div id="files-path">
-        <button class="f-btn" id="files-up">.. up</button>
+        <button class="f-btn" id="files-up">↑ Up</button>
         <span id="files-path-text">~</span>
       </div>
       <ul id="files-list"></ul>
@@ -307,31 +667,35 @@
 
   <!-- Windows Panel -->
   <div class="panel" id="panel-windows">
-    <div style="display:flex;flex-direction:column;gap:10px;padding:12px;height:100%;box-sizing:border-box;">
-      <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">
+    <div id="panel-windows-inner">
+      <div id="win-header">
         <button class="btn" id="win-refresh">Refresh</button>
-        <span id="win-status" style="color:var(--muted);font-size:12px;">Select a window to stream</span>
+        <span id="win-status">Select a window to stream</span>
       </div>
-      <div id="win-list" style="display:flex;flex-direction:column;gap:5px;overflow-y:auto;max-height:150px;flex-shrink:0;"></div>
-      <div style="position:relative;flex:1;min-height:0;">
-        <canvas id="win-canvas" style="width:100%;height:100%;border:1px solid #333;border-radius:6px;background:#000;cursor:crosshair;display:block;"></canvas>
+      <div id="win-list"></div>
+      <div id="win-canvas-wrap">
+        <canvas id="win-canvas"></canvas>
         <!-- Ask Claude FAB -->
         <button id="ask-fab" aria-label="Ask Claude about this screen">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2L13.09 8.26L19 7L14.74 11.74L21 12L14.74 12.26L19 17L13.09 15.74L12 22L10.91 15.74L5 17L9.26 12.26L3 12L9.26 11.74L5 7L10.91 8.26L12 2Z" fill="white" opacity="0.9"/>
-          </svg>
+          <div id="ask-fab-inner">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2L13.09 8.26L19 7L14.74 11.74L21 12L14.74 12.26L19 17L13.09 15.74L12 22L10.91 15.74L5 17L9.26 12.26L3 12L9.26 11.74L5 7L10.91 8.26L12 2Z" fill="white" opacity="0.95"/>
+            </svg>
+          </div>
         </button>
       </div>
     </div>
   </div>
 
-  <!-- Bottom bar -->
+  <!-- Bottom toolbar -->
   <div id="bar">
-    <div id="dot"></div>
-    <span id="status-text">--</span>
+    <div id="status-pill">
+      <div id="dot"></div>
+      <span id="status-text">--</span>
+    </div>
     <div class="sep"></div>
-    <button class="btn" id="btn-fs">FS</button>
-    <button class="btn" id="btn-kbd">KB</button>
+    <button class="btn" id="btn-fs">⛶</button>
+    <button class="btn" id="btn-kbd">⌨</button>
     <button class="btn" id="btn-clip">Clip</button>
     <div class="sep"></div>
     <button class="btn" id="btn-mic">Mic</button>
@@ -349,30 +713,30 @@
 
 <!-- D-pad -->
 <div id="dpad-wrap">
-  <div class="drow"><div class="dp ghost"></div><div class="dp" id="dp-u">&#x25B2;</div><div class="dp ghost"></div></div>
-  <div class="drow"><div class="dp" id="dp-l">&#x25C0;</div><div class="dp mid" id="dp-c">&#x25CF;<br>click</div><div class="dp" id="dp-r">&#x25B6;</div></div>
-  <div class="drow"><div class="dp ghost"></div><div class="dp" id="dp-d">&#x25BC;</div><div class="dp ghost"></div></div>
+  <div class="drow"><div class="dp ghost"></div><div class="dp" id="dp-u">▲</div><div class="dp ghost"></div></div>
+  <div class="drow"><div class="dp" id="dp-l">◀</div><div class="dp mid" id="dp-c">●<br>click</div><div class="dp" id="dp-r">▶</div></div>
+  <div class="drow"><div class="dp ghost"></div><div class="dp" id="dp-d">▼</div><div class="dp ghost"></div></div>
   <div id="speed-row"><label>speed</label><input type="range" id="speed-slider" min="2" max="60" value="12"></div>
 </div>
 
 <!-- Keyboard panel -->
 <div id="kbd-panel">
-  <input id="kbd-input" type="text" placeholder="Type and press Enter..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+  <input id="kbd-input" type="text" placeholder="Type and press Enter…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
   <div class="key-grid">
     <button class="k" data-key="Escape">Esc</button>
     <button class="k" data-key="Tab">Tab</button>
     <button class="k" data-key="Enter">Enter</button>
     <button class="k" data-key="Backspace">Bksp</button>
-    <button class="k" data-key="ArrowUp">Up</button>
-    <button class="k" data-key="ArrowDown">Dn</button>
-    <button class="k" data-key="ArrowLeft">Lt</button>
-    <button class="k" data-key="ArrowRight">Rt</button>
-    <button class="k" data-key="ctrl+c">^C</button>
-    <button class="k" data-key="ctrl+v">^V</button>
-    <button class="k" data-key="ctrl+z">^Z</button>
-    <button class="k" data-key="ctrl+a">^A</button>
-    <button class="k" data-key="ctrl+l">^L</button>
-    <button class="k" data-key="super">Super</button>
+    <button class="k" data-key="ArrowUp">↑</button>
+    <button class="k" data-key="ArrowDown">↓</button>
+    <button class="k" data-key="ArrowLeft">←</button>
+    <button class="k" data-key="ArrowRight">→</button>
+    <button class="k" data-key="ctrl+c">⌃C</button>
+    <button class="k" data-key="ctrl+v">⌃V</button>
+    <button class="k" data-key="ctrl+z">⌃Z</button>
+    <button class="k" data-key="ctrl+a">⌃A</button>
+    <button class="k" data-key="ctrl+l">⌃L</button>
+    <button class="k" data-key="super">⊞</button>
     <button class="k" data-key="ctrl+alt+t">Term</button>
     <button class="k" data-key="alt+F4">Alt+F4</button>
   </div>
@@ -382,7 +746,7 @@
 <div id="clip-modal">
   <div id="clip-box">
     <h3>Clipboard Sync</h3>
-    <textarea id="clip-textarea" placeholder="Paste here or type text to send to VNC..."></textarea>
+    <textarea id="clip-textarea" placeholder="Paste here or type text to send to VNC…"></textarea>
     <div id="clip-actions">
       <button class="btn" id="clip-send">Send to VNC</button>
       <button class="btn" id="clip-fetch">Get from VNC</button>
@@ -430,7 +794,7 @@ const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
 const wsBase = `${wsProto}://${location.host}`;
 
 let toastTimer = null;
-function toast(msg, ms = 2000) {
+function toast(msg, ms = 2200) {
   $('toast').textContent = msg;
   $('toast').classList.add('show');
   clearTimeout(toastTimer);
@@ -484,14 +848,14 @@ let curX = 640, curY = 400, lastClipboardFromVNC = '';
 
 function connect() {
   clearTimeout(retryTimer);
-  setDot('', 'Connecting...');
+  setDot('', 'Connecting…');
   show('ov-conn');
-  $('conn-msg').textContent = retryCount > 0 ? `Reconnecting (#${retryCount})` : 'Connecting...';
+  $('conn-msg').textContent = retryCount > 0 ? `Reconnecting (#${retryCount})` : 'Connecting…';
   try { rfb = new RFB($('vnc-wrap'), `${wsBase}/websockify`); } catch (e) { scheduleRetry('Init failed'); return; }
   rfb.scaleViewport = true; rfb.resizeSession = false; rfb.showDotCursor = true;
   rfb.clipViewport = false; rfb.qualityLevel = 6; rfb.compressionLevel = 2;
   rfb.addEventListener('connect', () => { hide('ov-conn'); setDot('ok', 'Connected'); retryCount = 0; setTimeout(applyMonitorView, 200); });
-  rfb.addEventListener('disconnect', () => { setDot('err', 'Disconnected'); scheduleRetry('Reconnecting...'); });
+  rfb.addEventListener('disconnect', () => { setDot('err', 'Disconnected'); scheduleRetry('Reconnecting…'); });
   rfb.addEventListener('clipboard', (e) => {
     lastClipboardFromVNC = e.detail.text;
     navigator.clipboard?.writeText?.(e.detail.text).catch(() => {});
@@ -509,29 +873,32 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && !r
 document.addEventListener('paste', (e) => { const t = e.clipboardData?.getData('text/plain'); if (t && rfb) rfb.clipboardPasteFrom(t); });
 connect();
 
-// ── Monitor selector ──────────────────────────────────────────────────────
-// VNC framebuffer = 3840x1080 — D2 is left half, D1 is right half
-// Simple approach: always use scaleViewport=true, CSS scale(2) + origin to zoom into half
+// ── Monitor selector — fixed D1/D2 zoom ──────────────────────────────────
+// VNC framebuffer = 3840×1080 (D2=left half, D1=right half)
+// We apply transform to the noVNC canvas, not the wrapper, so overflow:hidden clips correctly
 let currentMonitor = 'all';
 
 function applyMonitorView() {
-  const wrap = $('vnc-wrap');
   if (!rfb) return;
-  // Always let noVNC handle scaling to fit
+  const canvas = $('vnc-wrap').querySelector('canvas');
+  if (!canvas) return;
+
   rfb.scaleViewport = true;
-  rfb.clipViewport = false;
+  rfb.clipViewport  = false;
 
   if (currentMonitor === 'all') {
-    wrap.style.transform = '';
-    wrap.style.transformOrigin = '';
+    canvas.style.transform       = '';
+    canvas.style.transformOrigin = '';
   } else if (currentMonitor === '1') {
-    // D1 = right half of framebuffer → origin at center of right half (75% 50%)
-    wrap.style.transformOrigin = '75% 50%';
-    wrap.style.transform = 'scale(2)';
+    // D1 = right monitor = right half of framebuffer
+    // scale(2) from top-right corner → right half fills the container
+    canvas.style.transformOrigin = 'top right';
+    canvas.style.transform       = 'scale(2)';
   } else {
-    // D2 = left half of framebuffer → origin at center of left half (25% 50%)
-    wrap.style.transformOrigin = '25% 50%';
-    wrap.style.transform = 'scale(2)';
+    // D2 = left monitor = left half of framebuffer
+    // scale(2) from top-left corner → left half fills the container
+    canvas.style.transformOrigin = 'top left';
+    canvas.style.transform       = 'scale(2)';
   }
 }
 
@@ -545,7 +912,6 @@ function setMonitor(mon) {
 $('mon-1').addEventListener('click', () => setMonitor('1'));
 $('mon-2').addEventListener('click', () => setMonitor('2'));
 $('mon-all').addEventListener('click', () => setMonitor('all'));
-
 window.addEventListener('resize', () => { if (currentMonitor !== 'all') setTimeout(applyMonitorView, 100); });
 
 // Fullscreen
@@ -605,22 +971,22 @@ $('clip-fetch').addEventListener('click', async () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// TERMINAL (persistent shell via WebSocket + node-pty)
+// TERMINAL
 // ══════════════════════════════════════════════════════════════════════════════
 const term = new Terminal({
   cursorBlink: true,
-  fontSize: 14,
-  fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', Menlo, monospace",
+  fontSize: 13,
+  fontFamily: "'SF Mono', 'Cascadia Code', 'Fira Code', Menlo, monospace",
   theme: {
-    background: '#0d0d0f',
-    foreground: '#d0d0d8',
-    cursor: '#00e676',
-    selectionBackground: 'rgba(68,138,255,0.3)',
-    black: '#0d0d0f', red: '#ff5252', green: '#00e676', yellow: '#ffd740',
-    blue: '#448aff', magenta: '#e040fb', cyan: '#18ffff', white: '#d0d0d8',
-    brightBlack: '#555560', brightRed: '#ff8a80', brightGreen: '#69f0ae',
-    brightYellow: '#ffe57f', brightBlue: '#82b1ff', brightMagenta: '#ea80fc',
-    brightCyan: '#84ffff', brightWhite: '#ffffff',
+    background: '#000000',
+    foreground: '#F5F5F7',
+    cursor: '#30D158',
+    selectionBackground: 'rgba(10,132,255,0.28)',
+    black: '#1C1C1E', red: '#FF453A', green: '#30D158', yellow: '#FFD60A',
+    blue: '#0A84FF', magenta: '#BF5AF2', cyan: '#64D2FF', white: '#F5F5F7',
+    brightBlack: '#636366', brightRed: '#FF6961', brightGreen: '#6EDA91',
+    brightYellow: '#FFE57F', brightBlue: '#409CFF', brightMagenta: '#DA8FFF',
+    brightCyan: '#70D7FF', brightWhite: '#FFFFFF',
   },
   allowProposedApi: true,
   scrollback: 10000,
@@ -635,32 +1001,20 @@ let termConnected = false;
 function connectTerminal() {
   if (termWs && termWs.readyState <= WebSocket.OPEN) return;
   termWs = new WebSocket(`${wsBase}/terminal`);
-  termWs.onopen = () => {
-    termConnected = true;
-    fitTerminal();
-  };
+  termWs.onopen = () => { termConnected = true; fitTerminal(); };
   termWs.onmessage = (e) => term.write(e.data);
-  termWs.onclose = () => {
-    termConnected = false;
-    setTimeout(connectTerminal, 2000);
-  };
+  termWs.onclose = () => { termConnected = false; setTimeout(connectTerminal, 2000); };
   termWs.onerror = () => {};
 }
-
-term.onData((data) => {
-  if (termWs?.readyState === WebSocket.OPEN) termWs.send(data);
-});
-
+term.onData((data) => { if (termWs?.readyState === WebSocket.OPEN) termWs.send(data); });
 function fitTerminal() {
   if (activePanel !== 'panel-term') return;
   try {
     fitAddon.fit();
-    if (termWs?.readyState === WebSocket.OPEN) {
+    if (termWs?.readyState === WebSocket.OPEN)
       termWs.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
-    }
   } catch (_) {}
 }
-
 term.open($('term-container'));
 connectTerminal();
 window.addEventListener('resize', fitTerminal);
@@ -668,10 +1022,9 @@ window.addEventListener('resize', fitTerminal);
 // ══════════════════════════════════════════════════════════════════════════════
 // FILE BROWSER
 // ══════════════════════════════════════════════════════════════════════════════
-let currentFilesPath = '';  // Will be set from server's HOME
+let currentFilesPath = '';
 let filesList = [];
 
-// Detect initial path from server
 async function initFilesPath() {
   try {
     const res = await fetch('/api/files');
@@ -683,16 +1036,12 @@ initFilesPath();
 
 async function loadFiles(dir) {
   if (!dir) {
-    // First load - let server decide the default
     try {
       const res = await fetch('/api/files');
       const data = await res.json();
       if (data.error) { toast(data.error); return; }
-      filesList = data.items;
-      currentFilesPath = data.path;
-      $('files-path-text').textContent = data.path;
-      renderFiles();
-      return;
+      filesList = data.items; currentFilesPath = data.path;
+      $('files-path-text').textContent = data.path; renderFiles(); return;
     } catch (e) { toast('Failed to load files'); return; }
   }
   currentFilesPath = dir;
@@ -701,10 +1050,8 @@ async function loadFiles(dir) {
     const res = await fetch(`/api/files?path=${encodeURIComponent(dir)}`);
     const data = await res.json();
     if (data.error) { toast(data.error); return; }
-    filesList = data.items;
-    currentFilesPath = data.path;
-    $('files-path-text').textContent = data.path;
-    renderFiles();
+    filesList = data.items; currentFilesPath = data.path;
+    $('files-path-text').textContent = data.path; renderFiles();
   } catch (e) { toast('Failed to load files'); }
 }
 
@@ -713,7 +1060,7 @@ function renderFiles() {
   ul.innerHTML = '';
   for (const item of filesList) {
     const li = document.createElement('li');
-    const icon = item.type === 'dir' ? '&#x1F4C1;' : item.type === 'link' ? '&#x1F517;' : '&#x1F4C4;';
+    const icon = item.type === 'dir' ? '📁' : item.type === 'link' ? '🔗' : '📄';
     li.innerHTML = `<span class="f-icon">${icon}</span><span class="f-name">${esc(item.name)}</span>`;
     if (item.type === 'dir') {
       li.addEventListener('click', () => loadFiles(item.path));
@@ -732,16 +1079,11 @@ function renderFiles() {
 }
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-
 function downloadFile(filePath) {
   const a = document.createElement('a');
   a.href = `/api/files/download?path=${encodeURIComponent(filePath)}`;
-  a.download = '';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+  a.download = ''; document.body.appendChild(a); a.click(); a.remove();
 }
-
 async function previewFile(filePath, name) {
   try {
     const res = await fetch(`/api/files/read?path=${encodeURIComponent(filePath)}`);
@@ -752,17 +1094,13 @@ async function previewFile(filePath, name) {
     toggle('clip-modal', true);
   } catch { toast('Cannot read file'); }
 }
-
 $('files-up').addEventListener('click', () => {
-  // Handle both Windows (C:\foo\bar) and Unix (/foo/bar) paths
   const p = currentFilesPath;
   let parent;
   if (p.includes('\\')) {
-    // Windows path
     const parts = p.split('\\').filter(Boolean);
-    if (parts.length <= 1) parent = p.slice(0, 3); // e.g., "C:\"
+    if (parts.length <= 1) parent = p.slice(0, 3);
     else parent = parts.slice(0, -1).join('\\');
-    // Ensure drive letter has backslash
     if (parent.length === 2 && parent[1] === ':') parent += '\\';
   } else {
     parent = p.split('/').slice(0, -1).join('/') || '/';
@@ -770,7 +1108,6 @@ $('files-up').addEventListener('click', () => {
   loadFiles(parent);
 });
 
-// Upload
 const uploadArea = $('upload-area');
 const uploadInput = $('upload-input');
 uploadArea.addEventListener('click', () => uploadInput.click());
@@ -778,20 +1115,15 @@ uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.
 uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag'));
 uploadArea.addEventListener('drop', (e) => { e.preventDefault(); uploadArea.classList.remove('drag'); handleUpload(e.dataTransfer.files); });
 uploadInput.addEventListener('change', () => { handleUpload(uploadInput.files); uploadInput.value = ''; });
-
 async function handleUpload(files) {
-  // Detect path separator from current path
   const sep = currentFilesPath.includes('\\') ? '\\' : '/';
   for (const file of files) {
     const dest = `${currentFilesPath}${sep}${file.name}`;
     try {
       const buf = await file.arrayBuffer();
-      const res = await fetch(`/api/files/upload?path=${encodeURIComponent(dest)}`, {
-        method: 'PUT', body: buf,
-      });
+      const res = await fetch(`/api/files/upload?path=${encodeURIComponent(dest)}`, { method: 'PUT', body: buf });
       const data = await res.json();
-      if (data.ok) toast(`Uploaded ${file.name}`);
-      else toast(`Upload failed: ${data.error}`);
+      if (data.ok) toast(`Uploaded ${file.name}`); else toast(`Upload failed: ${data.error}`);
     } catch (e) { toast(`Upload error: ${e.message}`); }
   }
   loadFiles(currentFilesPath);
@@ -810,18 +1142,15 @@ async function startMic() {
     try {
       await micCtx.audioWorklet.addModule('/pcm-worklet.js');
       micWorklet = new AudioWorkletNode(micCtx, 'pcm-processor');
-      micWs = new WebSocket(`${wsBase}/audio-in`);
-      micWs.binaryType = 'arraybuffer';
+      micWs = new WebSocket(`${wsBase}/audio-in`); micWs.binaryType = 'arraybuffer';
       micWs.onclose = () => { if (micActive) stopMic(); };
       micWorklet.port.onmessage = ({ data }) => { if (micWs?.readyState === WebSocket.OPEN) micWs.send(data); };
-      src.connect(micWorklet); micWorklet.connect(micCtx.destination);
-      return;
+      src.connect(micWorklet); micWorklet.connect(micCtx.destination); return;
     } catch (e) { console.warn('[mic] Worklet fail, using ScriptProcessor'); }
   }
   const proc = micCtx.createScriptProcessor(256, 1, 1);
   micWorklet = proc;
-  micWs = new WebSocket(`${wsBase}/audio-in`);
-  micWs.binaryType = 'arraybuffer';
+  micWs = new WebSocket(`${wsBase}/audio-in`); micWs.binaryType = 'arraybuffer';
   micWs.onclose = () => { if (micActive) stopMic(); };
   src.connect(proc); proc.connect(micCtx.destination);
   proc.onaudioprocess = ({ inputBuffer }) => {
@@ -842,7 +1171,7 @@ function stopMic() {
 $('btn-mic').addEventListener('click', async () => {
   if (!micActive) {
     try { await startMic(); micActive = true; $('btn-mic').classList.add('on'); $('btn-mic').textContent = 'Mic ON'; toast('Mic relay active'); }
-    catch (e) { console.error('[mic] getUserMedia error:', e); toast(`Mic: ${e.name} - ${e.message}`); }
+    catch (e) { toast(`Mic: ${e.name}`); }
   } else { stopMic(); }
 });
 
@@ -882,7 +1211,7 @@ $('btn-cam').addEventListener('click', async () => {
       async function loop() { while (camLoop) { if (camWs.readyState === WebSocket.OPEN) { ctx2d.drawImage(video, 0, 0, 640, 480); const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.80)); if (blob && camWs.readyState === WebSocket.OPEN) camWs.send(await blob.arrayBuffer()); } await new Promise(r => setTimeout(r, 67)); } }
       camWs.onopen = () => loop(); camWs.onclose = () => { camLoop = false; };
       camActive = true; $('btn-cam').classList.add('on'); $('btn-cam').textContent = 'Cam ON'; toast('Camera relay active');
-    } catch (e) { console.error('[cam] getUserMedia error:', e); toast(`Cam: ${e.name} - ${e.message}`); }
+    } catch (e) { toast(`Cam: ${e.name}`); }
   } else {
     camLoop = false; camWs?.close(); camStream?.getTracks().forEach(t => t.stop());
     camWs = camStream = null; camActive = false; $('btn-cam').classList.remove('on'); $('btn-cam').textContent = 'Cam';
@@ -894,11 +1223,11 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').cat
 
 // ── Window stream & control ───────────────────────────────────────────────────
 let winWs     = null;
-let winActive = false; // currently streaming
-let activeWinId = null; // for Ask Claude
+let winActive = false;
+let activeWinId = null;
 
 async function loadWindows() {
-  $('win-status').textContent = 'Loading...';
+  $('win-status').textContent = 'Loading…';
   try {
     const res  = await fetch('/api/windows');
     const list = await res.json();
@@ -914,7 +1243,7 @@ async function loadWindows() {
       btn.onclick = () => startWindowStream(w.id);
       container.appendChild(btn);
     });
-    $('win-status').textContent = `${list.length} windows found`;
+    $('win-status').textContent = `${list.length} windows`;
   } catch (e) {
     $('win-status').textContent = 'Error: ' + e.message;
   }
@@ -928,7 +1257,7 @@ function startWindowStream(windowId) {
 
   winWs.onopen = () => {
     winWs.send(JSON.stringify({ id: windowId }));
-    $('win-status').textContent = 'Streaming...';
+    $('win-status').textContent = 'Streaming…';
     winActive = true;
     activeWinId = windowId;
     $('ask-fab').classList.add('visible');
@@ -939,21 +1268,15 @@ function startWindowStream(windowId) {
 
   winWs.onmessage = (e) => {
     if (typeof e.data === 'string') {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.error) $('win-status').textContent = 'Error: ' + msg.error;
-      } catch {}
+      try { const msg = JSON.parse(e.data); if (msg.error) $('win-status').textContent = 'Error: ' + msg.error; } catch {}
       return;
     }
     const blob = new Blob([e.data], { type: 'image/jpeg' });
-    // createImageBitmap is faster than new Image() — no DOM overhead
     createImageBitmap(blob).then((bmp) => {
       if (canvas.width !== bmp.width)  canvas.width  = bmp.width;
       if (canvas.height !== bmp.height) canvas.height = bmp.height;
-      ctx.drawImage(bmp, 0, 0);
-      bmp.close();
+      ctx.drawImage(bmp, 0, 0); bmp.close();
     }).catch(() => {
-      // fallback for browsers without createImageBitmap
       const url = URL.createObjectURL(blob);
       const img = new Image();
       img.onload = () => { canvas.width = img.width; canvas.height = img.height; ctx.drawImage(img, 0, 0); URL.revokeObjectURL(url); };
@@ -962,10 +1285,9 @@ function startWindowStream(windowId) {
   };
 
   winWs.onclose = () => {
-    winActive = false;
-    activeWinId = null;
+    winActive = false; activeWinId = null;
     $('ask-fab').classList.remove('visible');
-    if ($('win-status').textContent === 'Streaming...') $('win-status').textContent = 'Disconnected';
+    if ($('win-status').textContent === 'Streaming…') $('win-status').textContent = 'Disconnected';
   };
   winWs.onerror = () => { $('win-status').textContent = 'Connection error'; };
 }
@@ -976,78 +1298,43 @@ $('win-refresh').addEventListener('click', loadWindows);
 function sendWinCtrl(msg) {
   if (winWs && winWs.readyState === 1) winWs.send(JSON.stringify(msg));
 }
-
 function canvasCoords(e) {
   const rect = $('win-canvas').getBoundingClientRect();
   const scaleX = ($('win-canvas').width  || rect.width)  / rect.width;
   const scaleY = ($('win-canvas').height || rect.height) / rect.height;
-  return {
-    x: Math.round((e.clientX - rect.left) * scaleX),
-    y: Math.round((e.clientY - rect.top)  * scaleY),
-  };
+  return { x: Math.round((e.clientX - rect.left) * scaleX), y: Math.round((e.clientY - rect.top)  * scaleY) };
 }
 
 const winCanvas = $('win-canvas');
-winCanvas.addEventListener('mousemove', (e) => {
-  if (!winActive) return;
-  const {x, y} = canvasCoords(e);
-  sendWinCtrl({ type: 'mouse_move', x, y });
-});
-winCanvas.addEventListener('mousedown', (e) => {
-  if (!winActive) return;
-  e.preventDefault();
-  const {x, y} = canvasCoords(e);
-  sendWinCtrl({ type: 'mouse_down', x, y, button: e.button === 2 ? 'right' : 'left' });
-});
-winCanvas.addEventListener('mouseup', (e) => {
-  if (!winActive) return;
-  const {x, y} = canvasCoords(e);
-  sendWinCtrl({ type: 'mouse_up', x, y, button: e.button === 2 ? 'right' : 'left' });
-});
+winCanvas.addEventListener('mousemove', (e) => { if (!winActive) return; const {x,y} = canvasCoords(e); sendWinCtrl({ type:'mouse_move',x,y }); });
+winCanvas.addEventListener('mousedown', (e) => { if (!winActive) return; e.preventDefault(); const {x,y} = canvasCoords(e); sendWinCtrl({ type:'mouse_down',x,y,button:e.button===2?'right':'left' }); });
+winCanvas.addEventListener('mouseup',   (e) => { if (!winActive) return; const {x,y} = canvasCoords(e); sendWinCtrl({ type:'mouse_up',x,y,button:e.button===2?'right':'left' }); });
 winCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
-winCanvas.addEventListener('wheel', (e) => {
-  if (!winActive) return;
-  e.preventDefault();
-  const {x, y} = canvasCoords(e);
-  sendWinCtrl({ type: 'scroll', x, y, delta: -e.deltaY / 100 });
-}, { passive: false });
+winCanvas.addEventListener('wheel', (e) => { if (!winActive) return; e.preventDefault(); const {x,y} = canvasCoords(e); sendWinCtrl({ type:'scroll',x,y,delta:-e.deltaY/100 }); }, { passive: false });
 
-// Touch support — 1 finger = mouse drag, 2 fingers = scroll
 let lastPinchY = null;
 winCanvas.addEventListener('touchstart', (e) => {
-  if (!winActive) return;
-  e.preventDefault();
-  if (e.touches.length === 1) {
-    const {x, y} = canvasCoords(e.touches[0]);
-    sendWinCtrl({ type: 'mouse_down', x, y, button: 'left' });
-  } else if (e.touches.length === 2) {
-    lastPinchY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-  }
+  if (!winActive) return; e.preventDefault();
+  if (e.touches.length === 1) { const {x,y} = canvasCoords(e.touches[0]); sendWinCtrl({ type:'mouse_down',x,y,button:'left' }); }
+  else if (e.touches.length === 2) lastPinchY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
 }, { passive: false });
 winCanvas.addEventListener('touchmove', (e) => {
-  if (!winActive) return;
-  e.preventDefault();
-  if (e.touches.length === 1) {
-    const {x, y} = canvasCoords(e.touches[0]);
-    sendWinCtrl({ type: 'mouse_move', x, y });
-  } else if (e.touches.length === 2 && lastPinchY !== null) {
+  if (!winActive) return; e.preventDefault();
+  if (e.touches.length === 1) { const {x,y} = canvasCoords(e.touches[0]); sendWinCtrl({ type:'mouse_move',x,y }); }
+  else if (e.touches.length === 2 && lastPinchY !== null) {
     const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
     const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
     const delta = (midY - lastPinchY) / 30;
-    if (Math.abs(delta) > 0.1) {
-      const {x, y} = canvasCoords({ clientX: midX, clientY: midY });
-      sendWinCtrl({ type: 'scroll', x, y, delta });
-    }
+    if (Math.abs(delta) > 0.1) { const {x,y} = canvasCoords({ clientX:midX, clientY:midY }); sendWinCtrl({ type:'scroll',x,y,delta }); }
     lastPinchY = midY;
   }
 }, { passive: false });
 winCanvas.addEventListener('touchend', (e) => {
-  if (!winActive) return;
-  e.preventDefault();
+  if (!winActive) return; e.preventDefault();
   lastPinchY = null;
   if (e.changedTouches.length && e.touches.length === 0) {
-    const {x, y} = canvasCoords(e.changedTouches[0]);
-    sendWinCtrl({ type: 'mouse_up', x, y, button: 'left' });
+    const {x,y} = canvasCoords(e.changedTouches[0]);
+    sendWinCtrl({ type:'mouse_up',x,y,button:'left' });
   }
 }, { passive: false });
 
@@ -1058,14 +1345,12 @@ const askOverlay  = $('ask-sheet-overlay');
 const askInput    = $('ask-input');
 const askSend     = $('ask-send');
 const askResponse = $('ask-response');
-let askEs         = null; // active EventSource
-let activeWinId   = null; // currently streamed window id
+let askEs = null;
 
 function openAskSheet() {
   askSheet.classList.add('open');
   askOverlay.classList.add('open');
   askInput.focus();
-  // Auto-expand textarea
   askInput.style.height = 'auto';
 }
 function closeAskSheet() {
@@ -1074,11 +1359,9 @@ function closeAskSheet() {
   cancelAsk();
 }
 
-// FAB — show when streaming, open sheet on click
 askFab.addEventListener('click', openAskSheet);
 askOverlay.addEventListener('click', closeAskSheet);
 
-// Swipe down on handle to dismiss
 let sheetDragStart = null;
 $('ask-handle').addEventListener('touchstart', (e) => { sheetDragStart = e.touches[0].clientY; }, { passive: true });
 $('ask-handle').addEventListener('touchmove', (e) => {
@@ -1093,21 +1376,17 @@ $('ask-handle').addEventListener('touchend', (e) => {
   sheetDragStart = null;
 });
 
-// Auto-grow textarea
 askInput.addEventListener('input', () => {
   askInput.style.height = 'auto';
   askInput.style.height = Math.min(askInput.scrollHeight, 120) + 'px';
 });
-// Send on Enter (not Shift+Enter)
-askInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitAsk(); }
-});
+askInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitAsk(); } });
 askSend.addEventListener('click', submitAsk);
 
 function cancelAsk() {
   if (askEs) { askEs.close(); askEs = null; }
   askSend.disabled = false;
-  // Remove streaming cursor if present
+  askSheet.classList.remove('streaming');
   const cursor = askResponse.querySelector('.ask-cursor');
   if (cursor) cursor.remove();
 }
@@ -1119,8 +1398,8 @@ function submitAsk() {
   cancelAsk();
   askResponse.innerHTML = '';
   askSend.disabled = true;
+  askSheet.classList.add('streaming');
 
-  // Append cursor for streaming indicator
   const cursorEl = document.createElement('span');
   cursorEl.className = 'ask-cursor';
   askResponse.appendChild(cursorEl);
@@ -1129,11 +1408,9 @@ function submitAsk() {
   let textNode = document.createTextNode('');
   askResponse.insertBefore(textNode, cursorEl);
 
-  // POST to SSE endpoint with optional windowId
   const body = { question: q };
   if (activeWinId !== null) body.windowId = activeWinId;
 
-  // Use fetch + ReadableStream for SSE over POST
   fetch('/api/ask-claude', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1143,6 +1420,7 @@ function submitAsk() {
       const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
       askResponse.textContent = `Error: ${err.error || res.statusText}`;
       askSend.disabled = false;
+      askSheet.classList.remove('streaming');
       return;
     }
     const reader = res.body.getReader();
@@ -1153,7 +1431,7 @@ function submitAsk() {
       if (done) break;
       leftover += dec.decode(value, { stream: true });
       const lines = leftover.split('\n');
-      leftover = lines.pop(); // last may be incomplete
+      leftover = lines.pop();
       for (const line of lines) {
         if (line.startsWith('event: delta')) continue;
         if (line.startsWith('data: ') && line.includes('"text"')) {
@@ -1172,43 +1450,39 @@ function submitAsk() {
           } catch {}
           cursorEl.remove();
           askSend.disabled = false;
+          askSheet.classList.remove('streaming');
         }
       }
     }
     cursorEl.remove();
     askSend.disabled = false;
+    askSheet.classList.remove('streaming');
   }).catch((e) => {
     askResponse.textContent = `Network error: ${e.message}`;
     cursorEl.remove();
     askSend.disabled = false;
+    askSheet.classList.remove('streaming');
   });
 
   askInput.value = '';
   askInput.style.height = 'auto';
 }
 
-// Keyboard: capture when canvas is focused (click to focus)
 winCanvas.setAttribute('tabindex', '0');
 winCanvas.addEventListener('keydown', (e) => {
   if (!winActive) return;
   e.preventDefault();
-  // Map common keys to SendKeys format
   const keyMap = {
     Enter: '{ENTER}', Backspace: '{BACKSPACE}', Delete: '{DELETE}',
     Escape: '{ESC}', Tab: '{TAB}', ArrowUp: '{UP}', ArrowDown: '{DOWN}',
     ArrowLeft: '{LEFT}', ArrowRight: '{RIGHT}', Home: '{HOME}', End: '{END}',
     PageUp: '{PGUP}', PageDown: '{PGDN}', F1: '{F1}', F2: '{F2}',
-    F3: '{F3}', F4: '{F4}', F5: '{F5}', F10: '{F10}',
-    ' ': ' ',
+    F3: '{F3}', F4: '{F4}', F5: '{F5}', F10: '{F10}', ' ': ' ',
   };
   const mapped = keyMap[e.key];
-  if (mapped) {
-    sendWinCtrl({ type: 'key', keys: mapped });
-  } else if (e.ctrlKey && e.key.length === 1) {
-    sendWinCtrl({ type: 'key', keys: `^${e.key}` }); // Ctrl+key
-  } else if (e.key.length === 1) {
-    sendWinCtrl({ type: 'key', keys: e.key });
-  }
+  if (mapped) sendWinCtrl({ type: 'key', keys: mapped });
+  else if (e.ctrlKey && e.key.length === 1) sendWinCtrl({ type: 'key', keys: `^${e.key}` });
+  else if (e.key.length === 1) sendWinCtrl({ type: 'key', keys: e.key });
 });
 </script>
 </body>
