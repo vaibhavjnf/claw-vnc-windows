@@ -14,19 +14,25 @@ const path      = require('path');
 
 // ── Platform detection ───────────────────────────────────────────────────────
 const IS_WIN = os.platform() === 'win32';
+const IS_LINUX = os.platform() === 'linux';
 
 const PORT           = parseInt(process.env.PORT) || 8080;
 const VNC_HOST       = process.env.VNC_HOST || '127.0.0.1';
 const VNC_PORT       = parseInt(process.env.VNC_PORT) || (IS_WIN ? 5900 : 5901);
-const VNC_PASSWORD   = process.env.VNC_PASSWORD || 'vaibhavclaw';
+const VNC_PASSWORD   = process.env.VNC_PASSWORD;
 const HOME           = IS_WIN ? (process.env.USERPROFILE || 'C:\\Users') : (process.env.HOME || '/home/claw');
 
 // Bind to loopback only — tailscale serve handles external HTTPS access
 const BIND_HOST      = process.env.BIND_HOST || '127.0.0.1';
 
 // ── Authentication token ─────────────────────────────────────────────────────
-// Generate a random token on startup, or use env var for persistence across restarts
-const AUTH_TOKEN = process.env.CLAW_TOKEN || crypto.randomBytes(24).toString('base64url');
+const AUTH_TOKEN = process.env.CLAW_TOKEN;
+if (!AUTH_TOKEN || AUTH_TOKEN.length < 24) {
+  throw new Error('CLAW_TOKEN must be supplied externally and contain at least 24 characters');
+}
+if (!VNC_PASSWORD) {
+  throw new Error('VNC_PASSWORD must be supplied externally');
+}
 
 // ── File sandbox root ────────────────────────────────────────────────────────
 const FILE_ROOT = path.resolve(process.env.FILE_ROOT || HOME);
@@ -219,6 +225,10 @@ function setupV4L2() {
     console.log('  (Use OBS to capture MJPEG stream as virtual webcam if needed)');
     return;
   }
+  if (!IS_LINUX) {
+    console.log('  Camera: virtual device setup skipped on this platform');
+    return;
+  }
   const loaded = sh('lsmod | grep v4l2loopback');
   if (!loaded) {
     const r = sh(
@@ -235,7 +245,8 @@ function setupV4L2() {
 console.log(`\n[init] Platform: ${IS_WIN ? 'Windows' : 'Linux'}`);
 console.log('[init] Setting up virtual devices...');
 if (IS_WIN) setupAudioWindows();
-else        setupAudioLinux();
+else if (IS_LINUX) setupAudioLinux();
+else console.log('  Audio: virtual device setup skipped on this platform');
 setupV4L2();
 console.log('[init] Done\n');
 
@@ -1048,7 +1059,7 @@ windowStreamWss.on('connection', (ws) => {
 });
 
 // ── Direct TCP VNC proxy on :5900 (full-colour, 32bpp forced) ────────────────
-const VNC_PROXY_PORT = IS_WIN ? 5950 : 5900;  // Avoid conflict with VNC server on Windows
+const VNC_PROXY_PORT = parseInt(process.env.VNC_PROXY_PORT) || (IS_LINUX ? 5900 : 5950);
 
 function makeTcpVncProxy(clientSock) {
   console.log('[vnc-tcp] client connected');
@@ -1319,10 +1330,8 @@ server.on('upgrade', (req, socket, head) => {
 // ── Start ────────────────────────────────────────────────────────────────────
 server.listen(PORT, BIND_HOST, () => {
   console.log(`claw.vnc  ->  http://${BIND_HOST}:${PORT}`);
-  console.log(`\n[Auth] Access token: ${AUTH_TOKEN}`);
-  console.log(`[Auth] Login URL:    http://localhost:${PORT}/login`);
-  console.log(`[Auth] Direct URL:   http://localhost:${PORT}/?token=${AUTH_TOKEN}`);
-  console.log(`[Auth] Set CLAW_TOKEN env var for a persistent token across restarts\n`);
+  console.log(`\n[Auth] Login URL: http://localhost:${PORT}/login`);
+  console.log('[Auth] Access token loaded from the process environment and omitted from logs\n');
   console.log(`Camera preview:  http://localhost:${PORT}/camera-preview`);
   if (IS_WIN) {
     console.log(`\n[Windows Setup Guide]`);

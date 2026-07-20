@@ -43,12 +43,13 @@ npm install
 
 ## Configure
 
-Edit **`start.bat`** before first run:
+Set secrets in the process environment before first run. Do not store them in `start.bat`:
 
 ```bat
-set CLAW_TOKEN=your_secret_token     ← browser login password
-set ANTHROPIC_API_KEY=your_key_here  ← from console.anthropic.com
-set BIND_HOST=0.0.0.0                ← 0.0.0.0 for Tailscale/LAN, 127.0.0.1 for local only
+set CLAW_TOKEN=a_random_value_at_least_24_characters
+set VNC_PASSWORD=your_tightvnc_password
+set BIND_HOST=127.0.0.1
+start.bat
 ```
 
 > **Ask Claude works without an API key** if you've run `claude login` — it uses your Claude Code session.
@@ -96,9 +97,9 @@ http://<tailscale-ip>:8080/?token=your_secret_token
 ## Tailscale Setup
 
 1. Install Tailscale on this machine and your phone/laptop
-2. Set `BIND_HOST=0.0.0.0` in `start.bat`
-3. Run `tailscale ip` to get your Tailscale IP
-4. Access from any Tailscale device — no port forwarding, no public exposure
+2. Keep `BIND_HOST=127.0.0.1`.
+3. Publish the loopback service with `tailscale serve --bg http://127.0.0.1:8080`.
+4. Access the HTTPS URL reported by Tailscale. Do not add public port forwarding.
 
 ---
 
